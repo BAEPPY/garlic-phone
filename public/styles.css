@@ -14,19 +14,15 @@ body {
   min-height: 100vh;
   overflow-x: hidden;
   color: var(--ink);
-  background:
-    radial-gradient(circle at 15% 18%, rgba(255,255,237,.7), transparent 28%),
-    radial-gradient(circle at 85% 20%, rgba(255,182,113,.42), transparent 30%),
-    linear-gradient(145deg, #ffe8ca, #f6c892 55%, #e7a66f);
+  background: var(--page-bg, url("/assets/backgrounds/home-bg.png")) center / cover fixed no-repeat;
 }
+body[data-view="homeView"] { --page-bg: url("/assets/backgrounds/home-bg.png"); }
+body[data-view="lobbyView"] { --page-bg: url("/assets/backgrounds/lobby-bg.png"); }
+body[data-view="writeView"],
+body[data-view="drawView"] { --page-bg: url("/assets/backgrounds/game-bg.png"); }
+body[data-view="galleryView"] { --page-bg: url("/assets/backgrounds/result-bg.png"); }
 body::before {
-  content: "";
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  opacity: .18;
-  background-image: radial-gradient(#a96735 1.7px, transparent 1.7px);
-  background-size: 22px 22px;
+  display: none;
 }
 button, input, select, textarea { font: inherit; }
 button { cursor: pointer; }
@@ -578,6 +574,29 @@ textarea { min-height: 240px; padding: 18px; resize: vertical; font-size: 22px; 
   background: white;
 }
 .album-controls { display: flex; justify-content: center; gap: 16px; }
+.album-finish {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+.album-end-line {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: rgba(74,42,20,.55);
+  font-weight: 950;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+}
+.album-end-line::before, .album-end-line::after {
+  content: "";
+  height: 3px;
+  flex: 1;
+  background: rgba(123,71,36,.28);
+}
 @media (max-width: 980px) {
   .home-grid, .lobby-layout, .album-layout, .settings-content, .join-body, .setting-row { grid-template-columns: 1fr; }
   .preset-pane.active { grid-template-columns: repeat(2, minmax(140px, 1fr)); }
@@ -595,5 +614,5 @@ textarea { min-height: 240px; padding: 18px; resize: vertical; font-size: 22px; 
   .preset-pane.active { grid-template-columns: 1fr; }
   .lobby-actions, .stage-header, .stage-actions { flex-direction: column; }
   .clock-timer { width: 100%; max-width: 116px; align-self: center; }
-  .album-controls { flex-direction: column; }
+  .album-controls, .album-finish { flex-direction: column; }
 }

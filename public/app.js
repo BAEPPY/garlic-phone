@@ -76,7 +76,9 @@ const els = {
   albumPrompt: $("#albumPrompt"),
   albumDrawing: $("#albumDrawing"),
   prevAlbumButton: $("#prevAlbumButton"),
-  nextAlbumButton: $("#nextAlbumButton")
+  nextAlbumButton: $("#nextAlbumButton"),
+  saveAlbumButton: $("#saveAlbumButton"),
+  newGameButton: $("#newGameButton")
 };
 
 const ctx = els.drawCanvas.getContext("2d");
@@ -99,6 +101,7 @@ const promptSuggestions = [
 ];
 
 function showScreen(id) {
+  document.body.dataset.view = id;
   els.screens.forEach((screen) => screen.classList.toggle("active", screen.id === id));
 }
 
@@ -303,6 +306,22 @@ function moveAlbum(step) {
   if (!albums.length) return;
   state.selectedAlbumIndex = (state.selectedAlbumIndex + step + albums.length) % albums.length;
   renderSelectedAlbum();
+}
+
+function currentAlbum() {
+  return orderedAlbums()[state.selectedAlbumIndex] || null;
+}
+
+function saveCurrentAlbum() {
+  const album = currentAlbum();
+  const drawing = album?.drawings?.[0]?.drawing;
+  if (!drawing) return;
+  const link = document.createElement("a");
+  link.href = drawing;
+  link.download = `${album.authorName || "garlic-phone"}-album.png`;
+  document.body.append(link);
+  link.click();
+  link.remove();
 }
 
 function restartAlbumAuto() {
@@ -616,6 +635,13 @@ els.prevAlbumButton.addEventListener("click", () => {
 els.nextAlbumButton.addEventListener("click", () => {
   moveAlbum(1);
   restartAlbumAuto();
+});
+
+els.saveAlbumButton.addEventListener("click", saveCurrentAlbum);
+
+els.newGameButton.addEventListener("click", () => {
+  localStorage.removeItem("garlicPhonePlayerId");
+  location.href = "/";
 });
 
 [els.displayAutoToggle, els.albumSpeedSelect, els.albumReverseToggle].forEach((control) => {
