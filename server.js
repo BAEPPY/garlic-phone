@@ -56,10 +56,10 @@ function clamp(value, min, max, fallback) {
 }
 
 function timeSeconds(timeMode) {
-  if (timeMode === "fast") return { writeSeconds: 45, drawSeconds: 60 };
-  if (timeMode === "slow") return { writeSeconds: 120, drawSeconds: 150 };
+  if (timeMode === "fast") return { writeSeconds: 30, drawSeconds: 30 };
+  if (timeMode === "slow") return { writeSeconds: 60, drawSeconds: 60 };
   if (timeMode === "infinite") return { writeSeconds: 300, drawSeconds: 300 };
-  return { writeSeconds: 75, drawSeconds: 90 };
+  return { writeSeconds: 40, drawSeconds: 40 };
 }
 
 function makeSettings(settings = {}) {
