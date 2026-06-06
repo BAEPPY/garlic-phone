@@ -84,18 +84,18 @@ ctx.lineCap = "round";
 ctx.lineJoin = "round";
 paintBackground("#ffffff");
 
-const playerIcons = ["🧄", "🧅", "🌶", "🥕", "🥦", "🍆", "🍅", "🥔", "🥒", "🎃"];
-const avatarSets = [
-  ["garlic", "onion", "pepper", "carrot", "broccoli"],
-  ["garlic", "tomato", "carrot"],
-  ["potato", "pepper", "broccoli"],
-  ["cucumber", "carrot", "tomato"],
-  ["eggplant", "broccoli", "onion"],
-  ["pumpkin", "tomato", "garlic"],
-  ["garlic", "cucumber", "pepper"],
-  ["onion", "eggplant", "carrot"],
-  ["broccoli", "potato", "tomato"],
-  ["pepper", "pumpkin", "cucumber"]
+const avatarImages = Array.from({ length: 10 }, (_, index) => `/assets/avatars/avatar-${index}.png`);
+const promptSuggestions = [
+  "웃고 있는 마늘 캐릭터",
+  "운동장에서 춤추는 고추",
+  "칠판 앞에 선 브로콜리 선생님",
+  "비 오는 날 우산을 든 당근",
+  "소풍 가는 토마토 친구",
+  "달빛 아래 노래하는 가지",
+  "책을 읽는 감자 탐험가",
+  "파도가 치는 바다의 오이 배",
+  "호박 마차를 탄 채소 왕",
+  "눈사람을 만든 양파"
 ];
 
 function showScreen(id) {
@@ -115,9 +115,19 @@ function selectedMode() {
 }
 
 function renderAvatar() {
-  const index = ((state.avatarIndex % avatarSets.length) + avatarSets.length) % avatarSets.length;
-  els.veggieScene.className = `veggie-scene avatar-${index}`;
-  els.veggieScene.innerHTML = avatarSets[index].map((type) => `<b class="veg ${type}"></b>`).join("");
+  const index = normalizeAvatar(state.avatarIndex);
+  els.veggieScene.className = "veggie-scene image-avatar";
+  els.veggieScene.innerHTML = `<img src="${avatarImages[index]}" alt="프로필 채소" />`;
+}
+
+function normalizeAvatar(value) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return 0;
+  return ((number % avatarImages.length) + avatarImages.length) % avatarImages.length;
+}
+
+function avatarHtml(index, label = "프로필") {
+  return `<img class="avatar-img" src="${avatarImages[normalizeAvatar(index)]}" alt="${label}" />`;
 }
 
 function settingFromControls() {
@@ -235,19 +245,28 @@ function renderDrawing() {
 
 function renderGalleryScreen() {
   showScreen("galleryView");
+  els.albumSettings.hidden = false;
+  els.albumViewer.hidden = true;
+  window.clearInterval(state.albumAutoTimer);
   renderAlbumList();
-  renderSelectedAlbum();
 }
 
 function renderAlbumList() {
   const albums = orderedAlbums();
   if (state.selectedAlbumIndex >= albums.length) state.selectedAlbumIndex = 0;
   els.albumList.innerHTML = "";
+  if (!albums.length) {
+    const row = document.createElement("div");
+    row.className = "player-row empty";
+    row.innerHTML = `<span class="player-icon">+</span><span>아직 앨범이 없어요</span><span></span>`;
+    els.albumList.append(row);
+    return;
+  }
   albums.forEach((album, index) => {
     const button = document.createElement("button");
     button.className = `player-row album-row${index === state.selectedAlbumIndex ? " selected" : ""}`;
     button.type = "button";
-    button.innerHTML = `<span class="player-icon">${playerIcons[index % playerIcons.length]}</span><span>${escapeHtml(album.authorName)}의 앨범</span><span>${album.drawings.length}</span>`;
+    button.innerHTML = `<span class="player-icon">${avatarHtml(album.authorAvatar ?? index, `${album.authorName} 프로필`)}</span><span>${escapeHtml(album.authorName)}의 앨범</span><span>${album.drawings.length}</span>`;
     button.addEventListener("click", () => {
       state.selectedAlbumIndex = index;
       showAlbumViewer();
@@ -311,9 +330,8 @@ function renderPlayers(players, maxPlayers, hostId) {
     const player = players[i];
     const row = document.createElement("div");
     row.className = `player-row${player ? "" : " empty"}`;
-    const icon = playerIcons[(player?.avatar ?? i) % playerIcons.length];
     row.innerHTML = player
-      ? `<span class="player-icon">${icon}</span><span>${escapeHtml(player.name)}</span><span>${player.id === hostId ? "방장" : ""}</span>`
+      ? `<span class="player-icon">${avatarHtml(player.avatar ?? i, `${player.name} 프로필`)}</span><span>${escapeHtml(player.name)}</span><span>${player.id === hostId ? "방장" : ""}</span>`
       : `<span class="player-icon">+</span><span>EMPTY</span><span></span>`;
     els.playerList.append(row);
   }
@@ -413,11 +431,10 @@ async function saveSettings(extra = {}) {
 
 function updateClock(element, totalSeconds, finalNumber = false) {
   const remaining = state.room?.roundEndsAt ? Math.max(0, Math.ceil((state.room.roundEndsAt - Date.now()) / 1000)) : null;
-  const text = remaining === null ? "--:--" : `${String(Math.floor(remaining / 60)).padStart(2, "0")}:${String(remaining % 60).padStart(2, "0")}`;
   const progress = remaining === null ? 0 : 1 - remaining / Math.max(1, totalSeconds);
-  const showFinal = finalNumber && remaining !== null && remaining <= 10;
+  const showFinal = remaining !== null && remaining <= 10 && state.room?.stage !== "countdown";
   element.classList.toggle("final-count", showFinal);
-  element.querySelector("span").textContent = showFinal ? String(remaining) : text;
+  element.querySelector("span").textContent = showFinal ? String(remaining) : "";
   element.style.setProperty("--progress", `${Math.min(1, Math.max(0, progress)) * 360}deg`);
 }
 
@@ -433,18 +450,14 @@ els.modeButtons.forEach((button) => {
 });
 
 els.randomNameButton.addEventListener("click", () => {
-  state.avatarIndex = (state.avatarIndex + 1) % avatarSets.length;
+  state.avatarIndex = (state.avatarIndex + 1) % avatarImages.length;
   localStorage.setItem("garlicPhoneAvatar", String(state.avatarIndex));
   renderAvatar();
 });
 
 els.enterButton.addEventListener("click", async () => {
   try {
-    const name = els.playerName.value.trim();
-    if (!name) {
-      setStatus("닉네임을 먼저 입력해 주세요.");
-      return;
-    }
+    const name = els.playerName.value.trim() || `마늘친구${Math.floor(1000 + Math.random() * 9000)}`;
     const code = (els.joinCode.value || state.roomCode).trim().toUpperCase();
     const data = code
       ? await api(`/api/rooms/${code}/join`, { name, avatar: state.avatarIndex })
@@ -513,6 +526,9 @@ els.forceWritingButton.addEventListener("click", async () => {
 
 els.submitWritingButton.addEventListener("click", async () => {
   try {
+    if (!els.writingInput.value.trim()) {
+      els.writingInput.value = promptSuggestions[Math.floor(Math.random() * promptSuggestions.length)];
+    }
     const data = await api(`/api/rooms/${state.room.code}/submit-writing`, {
       playerId: state.playerId,
       text: els.writingInput.value
