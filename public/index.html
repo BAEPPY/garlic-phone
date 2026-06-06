@@ -8,155 +8,237 @@
   </head>
   <body>
     <main class="app">
-      <section class="hero">
-        <canvas id="heroCanvas" aria-hidden="true"></canvas>
-        <div class="hero-copy">
-          <p>최대 30명 · 관리자 관전 · QR 초대</p>
-          <h1>갈릭폰</h1>
-        </div>
-      </section>
-
-      <section id="adminView" class="view admin-view">
-        <aside class="control-panel">
-          <div class="room-heading">
-            <span>관리자 방</span>
-            <strong id="adminRoomCode">새 방</strong>
+      <section id="homeView" class="screen home-screen active">
+        <header class="top-bar">
+          <button class="small-button" type="button">🌐 KO</button>
+          <div class="mini-avatars" aria-hidden="true">
+            <span></span><span></span><span></span><span></span><span></span>
           </div>
+        </header>
 
-          <label class="field">
-            그리기 시간
-            <span class="range-row">
-              <input id="adminDrawTime" type="range" min="30" max="300" step="15" value="90" />
-              <output id="adminDrawTimeText">90초</output>
-            </span>
-          </label>
+        <section class="home-logo">
+          <div class="logo-mark">갈릭<br />폰</div>
+          <p>그림으로 이어지는 전화 게임</p>
+        </section>
 
-          <div class="button-grid">
-            <button id="createRoomButton">방 만들기</button>
-            <button id="startWritingButton" class="secondary">게임 시작</button>
-            <button id="startDrawingButton" class="secondary">그리기로 넘기기</button>
-            <button id="openGalleryButton" class="secondary">결과 보기</button>
-          </div>
-
-          <div class="invite-box">
-            <div class="section-title">초대</div>
-            <img id="qrImage" alt="초대 QR 코드" />
-            <canvas id="qrCanvas" class="qr-fallback" width="220" height="220"></canvas>
-            <input id="inviteLink" readonly />
-            <button id="copyInviteButton" class="secondary">링크 복사</button>
-          </div>
-        </aside>
-
-        <section class="main-panel">
-          <div class="stage-header">
-            <div>
-              <p id="adminStageLabel">대기실</p>
-              <h2 id="adminStageTitle">관리자는 게임에 참가하지 않고 진행만 해요.</h2>
+        <section class="home-grid">
+          <article class="home-card character-card">
+            <h2>익명 참가</h2>
+            <div class="garlic-avatar" aria-hidden="true">
+              <div class="garlic-face">G</div>
+              <button id="randomNameButton" type="button" title="닉네임 추천">?</button>
             </div>
-            <div id="adminTimer" class="timer">--:--</div>
-          </div>
+            <label>
+              닉네임을 정해 주세요
+              <input id="playerName" maxlength="18" autocomplete="name" placeholder="예: 마늘선생님" />
+            </label>
+            <label id="roomCodeField" class="room-code-field">
+              방 코드
+              <input id="joinCode" maxlength="6" placeholder="초대 링크면 자동 입력돼요" />
+            </label>
+            <button id="enterButton" class="primary-action" type="button">▶ 시작</button>
+            <p id="homeStatus" class="status"></p>
+          </article>
 
-          <div class="progress-grid">
-            <div>
-              <span>참가자</span>
-              <strong id="adminPlayerCount">0/30</strong>
+          <article class="home-card help-card">
+            <h2>게임 방법</h2>
+            <div class="help-illustration" aria-hidden="true">
+              <span>글</span>
+              <strong>→</strong>
+              <span>그림</span>
+              <strong>→</strong>
+              <span>웃음</span>
             </div>
-            <div>
-              <span>글 제출</span>
-              <strong id="adminWritingCount">0</strong>
-            </div>
-            <div>
-              <span>그림 제출</span>
-              <strong id="adminDrawingCount">0</strong>
-            </div>
-          </div>
-
-          <div id="adminPlayers" class="player-list"></div>
-          <div id="adminGallery" class="gallery"></div>
+            <h3>1. 문장을 쓰고</h3>
+            <p>친구가 그릴 수 있는 재미있는 문장을 적어요.</p>
+            <h3>2. 그림으로 전달하고</h3>
+            <p>받은 문장을 제한 시간 안에 그림으로 표현해요.</p>
+          </article>
         </section>
       </section>
 
-      <section id="joinView" class="view join-view">
-        <div class="join-panel">
-          <div class="room-heading">
-            <span>참가하기</span>
-            <strong id="joinRoomCode">방 코드</strong>
+      <section id="lobbyView" class="screen lobby-screen">
+        <header class="game-header">
+          <button id="leaveLobbyButton" class="small-button" type="button">◀ 나가기</button>
+          <div class="logo-mark small">갈릭폰</div>
+          <button class="sound-button" type="button" title="소리">🔊</button>
+        </header>
+
+        <section class="lobby-layout">
+          <aside class="players-panel">
+            <h2>참가자 <span id="playerCount">0/14</span></h2>
+            <select id="maxPlayersSelect" aria-label="최대 참가자 수">
+              <option value="6">6명</option>
+              <option value="8">8명</option>
+              <option value="10">10명</option>
+              <option value="14" selected>14명</option>
+              <option value="20">20명</option>
+              <option value="30">30명</option>
+            </select>
+            <div id="playerList" class="player-list"></div>
+          </aside>
+
+          <section class="settings-panel">
+            <div class="tabs">
+              <button class="tab active" type="button">프리셋</button>
+              <button class="tab active right" type="button">전체 설정</button>
+            </div>
+
+            <div class="settings-content">
+              <div class="preset-grid">
+                <button class="preset-card selected" type="button">
+                  <span>⚙️</span>
+                  <strong>일반</strong>
+                </button>
+                <button class="preset-card locked" type="button" disabled>
+                  <span>🎲</span>
+                  <strong>추후 추가</strong>
+                </button>
+                <button class="preset-card locked" type="button" disabled>
+                  <span>🧊</span>
+                  <strong>추후 추가</strong>
+                </button>
+              </div>
+
+              <div class="custom-settings">
+                <h2>전체 설정</h2>
+                <label class="setting-row">
+                  <span>
+                    <strong>시간</strong>
+                    <small>글쓰기와 그리기 제한 시간을 정해요.</small>
+                  </span>
+                  <select id="timePresetSelect">
+                    <option value="quick">빠르게</option>
+                    <option value="normal" selected>보통</option>
+                    <option value="slow">느긋하게</option>
+                  </select>
+                </label>
+
+                <label class="setting-row">
+                  <span>
+                    <strong>작업 흐름</strong>
+                    <small>일반 모드는 글쓰기 다음 그리기로 진행돼요.</small>
+                  </span>
+                  <select id="taskFlowSelect" disabled>
+                    <option>글쓰기, 그리기</option>
+                  </select>
+                </label>
+
+                <label class="setting-row">
+                  <span>
+                    <strong>턴</strong>
+                    <small>모든 참가자가 한 번씩 참여해요.</small>
+                  </span>
+                  <select id="turnsSelect">
+                    <option value="all" selected>전체</option>
+                    <option value="one">한 번</option>
+                  </select>
+                </label>
+
+                <label class="setting-row">
+                  <span>
+                    <strong>이어 그리기</strong>
+                    <small>이 버전에서는 새 캔버스에서 그려요.</small>
+                  </span>
+                  <select id="keepDrawingSelect">
+                    <option value="disabled" selected>꺼짐</option>
+                    <option value="enabled">켜짐</option>
+                  </select>
+                </label>
+
+                <label class="setting-row split">
+                  <span>
+                    <strong>점수판</strong>
+                    <small>결과 화면에서 점수 기능을 표시할지 정해요.</small>
+                  </span>
+                  <span class="toggle">
+                    <input id="scoreboardToggle" type="checkbox" />
+                    <span>OFF</span>
+                    <span>ON</span>
+                  </span>
+                </label>
+
+                <label class="setting-row">
+                  <span>
+                    <strong>공개 범위</strong>
+                    <small>초대 링크를 가진 사람만 들어올 수 있어요.</small>
+                  </span>
+                  <select id="secrecySelect">
+                    <option value="public" selected>링크 공개</option>
+                    <option value="private">비공개</option>
+                  </select>
+                </label>
+              </div>
+            </div>
+
+            <div class="lobby-actions">
+              <button id="copyInviteButton" class="secondary-action" type="button">🔗 초대</button>
+              <button id="qrButton" class="square-action" type="button">▦</button>
+              <button id="startGameButton" class="primary-action" type="button">▶ 시작</button>
+            </div>
+          </section>
+        </section>
+
+        <dialog id="inviteDialog">
+          <div class="dialog-content">
+            <button id="closeInviteButton" class="dialog-close" type="button">×</button>
+            <h2>초대하기</h2>
+            <img id="qrImage" alt="초대 QR 코드" />
+            <canvas id="qrCanvas" width="220" height="220"></canvas>
+            <input id="inviteLink" readonly />
           </div>
-          <label class="field">
-            닉네임
-            <input id="playerName" maxlength="18" placeholder="예: 지은" autocomplete="name" />
-          </label>
-          <label class="field">
-            방 코드
-            <input id="joinCode" maxlength="6" placeholder="초대 링크면 자동 입력돼요" />
-          </label>
-          <button id="joinButton">입장</button>
-          <p id="joinStatus" class="status">관리자가 만든 링크나 방 코드로 들어오세요.</p>
-        </div>
+        </dialog>
       </section>
 
-      <section id="waitView" class="view play-view">
-        <div class="stage-header">
-          <div>
-            <p>대기실</p>
-            <h2>관리자가 시작하면 글쓰기 화면으로 넘어가요.</h2>
-          </div>
-          <strong id="waitPlayerCount" class="pill">0/30</strong>
-        </div>
-        <div id="waitPlayers" class="player-list wide"></div>
-      </section>
-
-      <section id="writeView" class="view play-view">
-        <div class="stage-header">
+      <section id="writeView" class="screen play-screen">
+        <header class="stage-header">
           <div>
             <p>글쓰기</p>
             <h2>다음 사람이 그릴 수 있는 문장을 써 주세요.</h2>
           </div>
           <div id="writeTimer" class="timer">--:--</div>
-        </div>
+        </header>
         <div class="writing-page">
           <textarea id="writingInput" maxlength="100" placeholder="예: 비 오는 날 횡단보도에서 춤추는 우주비행사"></textarea>
-          <button id="submitWritingButton">글 제출</button>
+          <button id="submitWritingButton" class="primary-action" type="button">글 제출</button>
           <p id="writingStatus" class="status">100자 안으로 입력할 수 있어요.</p>
         </div>
       </section>
 
-      <section id="drawView" class="view draw-view">
-        <div class="stage-header">
+      <section id="drawView" class="screen draw-screen">
+        <header class="stage-header">
           <div>
             <p>그리기</p>
             <h2 id="drawingPrompt">제시어를 기다리는 중이에요.</h2>
           </div>
           <div id="drawTimer" class="timer">--:--</div>
-        </div>
-
+        </header>
         <div class="canvas-shell">
           <canvas id="drawCanvas" width="1120" height="720"></canvas>
         </div>
-
         <div class="tool-strip">
           <div class="segmented" role="group" aria-label="그리기 도구">
-            <button id="pencilTool" class="tool active" data-tool="pencil" title="연필">✎</button>
-            <button id="bucketTool" class="tool" data-tool="bucket" title="페인트 통">▣</button>
-            <button id="eraserTool" class="tool" data-tool="eraser" title="지우개">⌫</button>
+            <button class="tool active" data-tool="pencil" title="연필" type="button">✎</button>
+            <button class="tool" data-tool="bucket" title="페인트 통" type="button">▣</button>
+            <button class="tool" data-tool="eraser" title="지우개" type="button">⌫</button>
           </div>
-          <input id="colorInput" type="color" value="#111827" title="색상" aria-label="색상" />
+          <input id="colorInput" type="color" value="#21123f" title="색상" aria-label="색상" />
           <input id="sizeInput" type="range" min="2" max="40" value="8" title="크기" aria-label="크기" />
-          <button id="undoButton" class="secondary" title="되돌리기">↶</button>
-          <button id="clearButton" class="secondary" title="전체 지우기">전체 지우기</button>
-          <button id="submitDrawingButton">그림 제출</button>
+          <button id="undoButton" class="secondary-action" title="되돌리기" type="button">↶</button>
+          <button id="clearButton" class="secondary-action" title="전체 지우기" type="button">전체 지우기</button>
+          <button id="submitDrawingButton" class="primary-action" type="button">그림 제출</button>
         </div>
         <p id="drawingStatus" class="status"></p>
       </section>
 
-      <section id="galleryView" class="view play-view">
-        <div class="stage-header">
+      <section id="galleryView" class="screen play-screen">
+        <header class="stage-header">
           <div>
             <p>결과</p>
             <h2>문장이 그림으로 바뀐 결과예요.</h2>
           </div>
-        </div>
-        <div id="playerGallery" class="gallery"></div>
+        </header>
+        <div id="gallery" class="gallery"></div>
       </section>
     </main>
     <script src="/app.js"></script>

@@ -1,8 +1,7 @@
 const params = new URLSearchParams(location.search);
+const savedPlayerId = localStorage.getItem("garlicPhonePlayerId") || "";
 const state = {
-  mode: params.get("admin") ? "admin" : "player",
-  adminId: params.get("admin") || localStorage.getItem("drawingPhoneAdminId") || "",
-  playerId: localStorage.getItem("drawingPhonePlayerId") || "",
+  playerId: savedPlayerId,
   roomCode: params.get("room") || "",
   room: null,
   source: null,
@@ -14,34 +13,32 @@ const state = {
 
 const $ = (selector) => document.querySelector(selector);
 const els = {
-  views: [...document.querySelectorAll(".view")],
-  heroCanvas: $("#heroCanvas"),
-  adminRoomCode: $("#adminRoomCode"),
-  adminDrawTime: $("#adminDrawTime"),
-  adminDrawTimeText: $("#adminDrawTimeText"),
-  createRoomButton: $("#createRoomButton"),
-  startWritingButton: $("#startWritingButton"),
-  startDrawingButton: $("#startDrawingButton"),
-  openGalleryButton: $("#openGalleryButton"),
+  screens: [...document.querySelectorAll(".screen")],
+  homeView: $("#homeView"),
+  lobbyView: $("#lobbyView"),
+  playerName: $("#playerName"),
+  joinCode: $("#joinCode"),
+  roomCodeField: $("#roomCodeField"),
+  enterButton: $("#enterButton"),
+  randomNameButton: $("#randomNameButton"),
+  homeStatus: $("#homeStatus"),
+  leaveLobbyButton: $("#leaveLobbyButton"),
+  playerCount: $("#playerCount"),
+  maxPlayersSelect: $("#maxPlayersSelect"),
+  playerList: $("#playerList"),
+  timePresetSelect: $("#timePresetSelect"),
+  turnsSelect: $("#turnsSelect"),
+  keepDrawingSelect: $("#keepDrawingSelect"),
+  scoreboardToggle: $("#scoreboardToggle"),
+  secrecySelect: $("#secrecySelect"),
+  copyInviteButton: $("#copyInviteButton"),
+  qrButton: $("#qrButton"),
+  startGameButton: $("#startGameButton"),
+  inviteDialog: $("#inviteDialog"),
+  closeInviteButton: $("#closeInviteButton"),
   qrImage: $("#qrImage"),
   qrCanvas: $("#qrCanvas"),
   inviteLink: $("#inviteLink"),
-  copyInviteButton: $("#copyInviteButton"),
-  adminStageLabel: $("#adminStageLabel"),
-  adminStageTitle: $("#adminStageTitle"),
-  adminTimer: $("#adminTimer"),
-  adminPlayerCount: $("#adminPlayerCount"),
-  adminWritingCount: $("#adminWritingCount"),
-  adminDrawingCount: $("#adminDrawingCount"),
-  adminPlayers: $("#adminPlayers"),
-  adminGallery: $("#adminGallery"),
-  joinRoomCode: $("#joinRoomCode"),
-  playerName: $("#playerName"),
-  joinCode: $("#joinCode"),
-  joinButton: $("#joinButton"),
-  joinStatus: $("#joinStatus"),
-  waitPlayerCount: $("#waitPlayerCount"),
-  waitPlayers: $("#waitPlayers"),
   writeTimer: $("#writeTimer"),
   writingInput: $("#writingInput"),
   submitWritingButton: $("#submitWritingButton"),
@@ -56,7 +53,7 @@ const els = {
   clearButton: $("#clearButton"),
   submitDrawingButton: $("#submitDrawingButton"),
   drawingStatus: $("#drawingStatus"),
-  playerGallery: $("#playerGallery")
+  gallery: $("#gallery")
 };
 
 const ctx = els.drawCanvas.getContext("2d");
@@ -64,20 +61,39 @@ ctx.lineCap = "round";
 ctx.lineJoin = "round";
 paintBackground("#ffffff");
 
-els.qrImage.addEventListener("error", () => {
-  els.qrCanvas.classList.add("active");
-});
+const names = ["마늘선생님", "칠판요정", "분필장인", "급식히어로", "교실탐험가", "숙제박사"];
 
-els.qrImage.addEventListener("load", () => {
-  els.qrCanvas.classList.remove("active");
-});
-
-function secondsLabel(value) {
-  return `${value}초`;
+function showScreen(id) {
+  els.screens.forEach((screen) => screen.classList.toggle("active", screen.id === id));
 }
 
-function showView(id) {
-  els.views.forEach((view) => view.classList.toggle("active", view.id === id));
+function settingFromControls() {
+  const time = els.timePresetSelect.value;
+  const timeMap = {
+    quick: { writeSeconds: 45, drawSeconds: 60 },
+    normal: { writeSeconds: 75, drawSeconds: 90 },
+    slow: { writeSeconds: 120, drawSeconds: 150 }
+  };
+  return {
+    maxPlayers: Number(els.maxPlayersSelect.value),
+    ...timeMap[time],
+    turns: els.turnsSelect.value,
+    keepDrawing: els.keepDrawingSelect.value === "enabled",
+    scoreboard: els.scoreboardToggle.checked,
+    secrecy: els.secrecySelect.value
+  };
+}
+
+function controlsFromSettings(settings) {
+  if (!settings) return;
+  els.maxPlayersSelect.value = String(settings.maxPlayers);
+  if (settings.writeSeconds <= 45) els.timePresetSelect.value = "quick";
+  else if (settings.writeSeconds >= 120) els.timePresetSelect.value = "slow";
+  else els.timePresetSelect.value = "normal";
+  els.turnsSelect.value = settings.turns;
+  els.keepDrawingSelect.value = settings.keepDrawing ? "enabled" : "disabled";
+  els.scoreboardToggle.checked = Boolean(settings.scoreboard);
+  els.secrecySelect.value = settings.secrecy;
 }
 
 async function api(path, body) {
@@ -92,144 +108,78 @@ async function api(path, body) {
 }
 
 function connectEvents() {
-  if (!state.roomCode) return;
+  if (!state.roomCode || !state.playerId) return;
   if (state.source) state.source.close();
-  const client = state.mode === "admin" ? state.adminId : state.playerId;
-  state.source = new EventSource(`/api/rooms/${state.roomCode}/events?client=${encodeURIComponent(client)}`);
+  state.source = new EventSource(`/api/rooms/${state.roomCode}/events?client=${encodeURIComponent(state.playerId)}`);
   state.source.onmessage = (event) => {
     state.room = JSON.parse(event.data);
     render();
   };
   state.source.onerror = () => {
-    if (!state.room) setPlayerStatus("방 정보를 불러오지 못했어요.");
+    if (!state.room) setStatus("방 정보를 불러오지 못했어요.");
   };
 }
 
-function setAdmin(room, adminId) {
-  state.mode = "admin";
-  state.adminId = adminId;
-  state.roomCode = room.code;
-  state.room = room;
-  localStorage.setItem("drawingPhoneAdminId", adminId);
-  history.replaceState(null, "", `/?room=${room.code}&admin=${adminId}`);
-  connectEvents();
-  render();
-}
-
-function setPlayer(room, playerId) {
-  state.mode = "player";
+function enterRoom(room, playerId) {
   state.playerId = playerId;
   state.roomCode = room.code;
   state.room = room;
-  localStorage.setItem("drawingPhonePlayerId", playerId);
+  localStorage.setItem("garlicPhonePlayerId", playerId);
   history.replaceState(null, "", `/?room=${room.code}`);
   connectEvents();
   render();
 }
 
 function render() {
-  if (state.mode === "admin") renderAdmin();
-  else renderPlayer();
-}
-
-function renderAdmin() {
-  showView("adminView");
-  const room = state.room;
-  els.adminRoomCode.textContent = room?.code || "새 방";
-  els.startWritingButton.disabled = !room || room.stage !== "lobby" || room.players.length < 1;
-  els.startDrawingButton.disabled = !room || room.stage !== "writing";
-  els.openGalleryButton.disabled = !room || room.stage === "lobby";
-  els.copyInviteButton.disabled = !room;
-  els.inviteLink.value = room ? inviteUrl(room.code) : "";
-  els.adminDrawTime.disabled = !room || room.stage !== "lobby";
-
-  if (!room) {
-    drawQr("");
-    els.qrImage.removeAttribute("src");
-    els.qrCanvas.classList.add("active");
-    return;
-  }
-
-  els.adminDrawTime.value = room.drawSeconds;
-  els.adminDrawTimeText.textContent = secondsLabel(room.drawSeconds);
-  els.adminStageLabel.textContent = stageName(room.stage);
-  els.adminStageTitle.textContent = adminTitle(room);
-  els.adminPlayerCount.textContent = `${room.players.length}/30`;
-  els.adminWritingCount.textContent = `${room.writingCount}/${room.players.length}`;
-  els.adminDrawingCount.textContent = `${room.drawingCount}/${room.players.length}`;
-  renderPlayers(els.adminPlayers, room.players);
-  renderGallery(els.adminGallery, room.gallery);
-  els.qrCanvas.classList.remove("active");
-  els.qrImage.src = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(inviteUrl(room.code))}`;
-  drawQr(inviteUrl(room.code));
-}
-
-function renderPlayer() {
-  const room = state.room;
-  if (!room || !state.playerId) {
-    showView("joinView");
-    els.joinRoomCode.textContent = state.roomCode || "방 코드";
+  if (!state.room || !state.playerId) {
+    showScreen("homeView");
+    els.roomCodeField.classList.toggle("hidden", !state.roomCode);
     els.joinCode.value = state.roomCode;
     return;
   }
 
-  if (room.stage === "lobby") {
-    showView("waitView");
-    els.waitPlayerCount.textContent = `${room.players.length}/30`;
-    renderPlayers(els.waitPlayers, room.players);
-  }
+  if (state.room.stage === "lobby") renderLobby();
+  if (state.room.stage === "writing") renderWriting();
+  if (state.room.stage === "drawing") renderDrawing();
+  if (state.room.stage === "gallery") renderGalleryScreen();
+}
 
-  if (room.stage === "writing") {
-    showView("writeView");
-    els.submitWritingButton.disabled = Boolean(room.myWriting);
-    els.writingInput.disabled = Boolean(room.myWriting);
-    if (room.myWriting) {
-      els.writingInput.value = room.myWriting;
-      els.writingStatus.textContent = "제출했어요. 다른 사람들을 기다리는 중이에요.";
-    }
-  }
+function renderLobby() {
+  showScreen("lobbyView");
+  const room = state.room;
+  const isHost = room.hostId === state.playerId;
+  controlsFromSettings(room.settings);
+  els.playerCount.textContent = `${room.players.length}/${room.settings.maxPlayers}`;
+  renderPlayers(room.players, room.settings.maxPlayers, room.hostId);
+  setControlsDisabled(!isHost);
+  els.startGameButton.disabled = !isHost || room.players.length < 1;
+  els.inviteLink.value = inviteUrl(room.code);
+  setQr(inviteUrl(room.code));
+}
 
-  if (room.stage === "drawing") {
-    showView("drawView");
-    els.drawingPrompt.textContent = room.assignedPrompt || "상상 속 장면";
-    els.submitDrawingButton.disabled = Boolean(room.myDrawing);
-    els.drawingStatus.textContent = room.myDrawing ? "제출했어요. 결과를 기다리는 중이에요." : "";
-  }
-
-  if (room.stage === "gallery") {
-    showView("galleryView");
-    renderGallery(els.playerGallery, room.gallery);
+function renderWriting() {
+  showScreen("writeView");
+  els.submitWritingButton.disabled = Boolean(state.room.myWriting);
+  els.writingInput.disabled = Boolean(state.room.myWriting);
+  if (state.room.myWriting) {
+    els.writingInput.value = state.room.myWriting;
+    els.writingStatus.textContent = "제출했어요. 다른 사람들을 기다리는 중이에요.";
+  } else {
+    els.writingStatus.textContent = "100자 안으로 입력할 수 있어요.";
   }
 }
 
-function stageName(stage) {
-  return ({ lobby: "대기실", writing: "글쓰기", drawing: "그리기", gallery: "결과" })[stage] || "대기실";
+function renderDrawing() {
+  showScreen("drawView");
+  els.drawingPrompt.textContent = state.room.assignedPrompt || "상상 속 장면";
+  els.submitDrawingButton.disabled = Boolean(state.room.myDrawing);
+  els.drawingStatus.textContent = state.room.myDrawing ? "제출했어요. 결과를 기다리는 중이에요." : "";
 }
 
-function adminTitle(room) {
-  if (room.stage === "lobby") return "참가자가 들어오면 게임을 시작할 수 있어요.";
-  if (room.stage === "writing") return "참가자들이 문장을 쓰는 중이에요.";
-  if (room.stage === "drawing") return "참가자들이 받은 문장을 그리고 있어요.";
-  return "제출된 그림을 함께 확인하세요.";
-}
-
-function renderPlayers(target, players) {
-  target.innerHTML = "";
-  if (!players.length) {
-    target.innerHTML = `<div class="player">아직 참가자가 없어요.</div>`;
-    return;
-  }
-  players.forEach((player, index) => {
-    const item = document.createElement("div");
-    item.className = "player";
-    item.innerHTML = `<span>${escapeHtml(player.name)}</span><small>${index + 1}</small>`;
-    target.append(item);
-  });
-}
-
-function renderGallery(target, gallery) {
-  target.innerHTML = "";
-  gallery.forEach((item) => {
+function renderGalleryScreen() {
+  showScreen("galleryView");
+  els.gallery.innerHTML = "";
+  state.room.gallery.forEach((item) => {
     const card = document.createElement("article");
     card.className = "gallery-card";
     card.innerHTML = `
@@ -239,12 +189,68 @@ function renderGallery(target, gallery) {
         <span>${escapeHtml(item.prompt || "")}</span>
       </div>
     `;
-    target.append(card);
+    els.gallery.append(card);
   });
 }
 
-function setPlayerStatus(message) {
-  els.joinStatus.textContent = message;
+function setControlsDisabled(disabled) {
+  [
+    els.maxPlayersSelect,
+    els.timePresetSelect,
+    els.turnsSelect,
+    els.keepDrawingSelect,
+    els.scoreboardToggle,
+    els.secrecySelect
+  ].forEach((control) => {
+    control.disabled = disabled;
+  });
+}
+
+function renderPlayers(players, maxPlayers, hostId) {
+  els.playerList.innerHTML = "";
+  for (let i = 0; i < maxPlayers; i += 1) {
+    const player = players[i];
+    const row = document.createElement("div");
+    row.className = `player-row${player ? "" : " empty"}`;
+    row.innerHTML = player
+      ? `<span class="player-icon">🧄</span><span>${escapeHtml(player.name)}</span><span>${player.id === hostId ? "👑" : ""}</span>`
+      : `<span class="player-icon">☺</span><span>EMPTY</span><span></span>`;
+    els.playerList.append(row);
+  }
+}
+
+function setStatus(message) {
+  els.homeStatus.textContent = message;
+}
+
+function inviteUrl(code) {
+  return `${location.origin}/?room=${code}`;
+}
+
+function setQr(url) {
+  els.qrImage.src = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(url)}`;
+  drawQrFallback(url);
+}
+
+function drawQrFallback(text) {
+  const canvas = els.qrCanvas;
+  const qr = canvas.getContext("2d");
+  qr.fillStyle = "#ffffff";
+  qr.fillRect(0, 0, canvas.width, canvas.height);
+  qr.fillStyle = "#32156b";
+  qr.font = "800 15px sans-serif";
+  qr.textAlign = "center";
+  qr.fillText("QR을 불러오지 못하면", 110, 102);
+  qr.fillText("링크를 복사해 주세요", 110, 126);
+  if (!text) return;
+  let seed = 0;
+  for (const char of text) seed = (seed + char.charCodeAt(0) * 17) % 9973;
+  for (let y = 0; y < 17; y += 1) {
+    for (let x = 0; x < 17; x += 1) {
+      seed = (seed * 37 + x + y) % 9973;
+      if (seed % 3 === 0) qr.fillRect(18 + x * 8, 18 + y * 8, 8, 8);
+    }
+  }
 }
 
 function escapeHtml(value) {
@@ -255,61 +261,6 @@ function escapeHtml(value) {
     '"': "&quot;",
     "'": "&#039;"
   }[char]));
-}
-
-function inviteUrl(code) {
-  return `${location.origin}/?room=${code}`;
-}
-
-function drawQr(text) {
-  const canvas = els.qrCanvas;
-  const qr = canvas.getContext("2d");
-  qr.fillStyle = "#ffffff";
-  qr.fillRect(0, 0, canvas.width, canvas.height);
-  if (!text) {
-    qr.fillStyle = "#64748b";
-    qr.font = "700 16px sans-serif";
-    qr.textAlign = "center";
-    qr.fillText("방을 만들면", 110, 103);
-    qr.fillText("QR이 생겨요", 110, 126);
-    return;
-  }
-
-  const grid = 29;
-  const pad = 14;
-  const cell = Math.floor((canvas.width - pad * 2) / grid);
-  const bits = hashBits(text, grid * grid);
-  qr.fillStyle = "#111827";
-  drawFinder(qr, pad, pad, cell);
-  drawFinder(qr, pad + cell * 22, pad, cell);
-  drawFinder(qr, pad, pad + cell * 22, cell);
-  for (let y = 0; y < grid; y += 1) {
-    for (let x = 0; x < grid; x += 1) {
-      if (inFinder(x, y)) continue;
-      if (bits[y * grid + x]) qr.fillRect(pad + x * cell, pad + y * cell, cell, cell);
-    }
-  }
-}
-
-function hashBits(text, length) {
-  let seed = 2166136261;
-  for (const char of text) seed = Math.imul(seed ^ char.charCodeAt(0), 16777619);
-  return Array.from({ length }, (_, index) => {
-    seed = Math.imul(seed ^ (index + 31), 16777619);
-    return (seed >>> 27) & 1;
-  });
-}
-
-function drawFinder(qr, x, y, cell) {
-  qr.fillRect(x, y, cell * 7, cell * 7);
-  qr.fillStyle = "#ffffff";
-  qr.fillRect(x + cell, y + cell, cell * 5, cell * 5);
-  qr.fillStyle = "#111827";
-  qr.fillRect(x + cell * 2, y + cell * 2, cell * 3, cell * 3);
-}
-
-function inFinder(x, y) {
-  return (x < 8 && y < 8) || (x > 20 && y < 8) || (x < 8 && y > 20);
 }
 
 function paintBackground(color) {
@@ -347,65 +298,86 @@ function canDraw() {
   return state.room?.stage === "drawing" && !state.room.myDrawing;
 }
 
-els.createRoomButton.addEventListener("click", async () => {
-  try {
-    const data = await api("/api/rooms", { drawSeconds: Number(els.adminDrawTime.value) });
-    setAdmin(data.room, data.adminId);
-  } catch (error) {
-    els.adminStageTitle.textContent = error.message;
-  }
-});
-
-els.adminDrawTime.addEventListener("input", async () => {
-  els.adminDrawTimeText.textContent = secondsLabel(els.adminDrawTime.value);
-  if (!state.room) return;
+async function saveSettings() {
+  if (!state.room || state.room.hostId !== state.playerId) return;
   try {
     await api(`/api/rooms/${state.room.code}/settings`, {
-      adminId: state.adminId,
-      drawSeconds: Number(els.adminDrawTime.value)
+      playerId: state.playerId,
+      settings: settingFromControls()
     });
   } catch (error) {
-    els.adminStageTitle.textContent = error.message;
+    setStatus(error.message);
+  }
+}
+
+els.randomNameButton.addEventListener("click", () => {
+  els.playerName.value = names[Math.floor(Math.random() * names.length)];
+});
+
+els.enterButton.addEventListener("click", async () => {
+  try {
+    const name = els.playerName.value.trim();
+    if (!name) {
+      setStatus("닉네임을 먼저 입력해 주세요.");
+      return;
+    }
+    const code = (els.joinCode.value || state.roomCode).trim().toUpperCase();
+    const data = code
+      ? await api(`/api/rooms/${code}/join`, { name })
+      : await api("/api/rooms", { name, settings: settingFromControls() });
+    enterRoom(data.room, data.playerId);
+  } catch (error) {
+    setStatus(error.message);
   }
 });
 
-els.startWritingButton.addEventListener("click", async () => {
-  try {
-    await api(`/api/rooms/${state.room.code}/start-writing`, { adminId: state.adminId });
-  } catch (error) {
-    els.adminStageTitle.textContent = error.message;
-  }
+els.leaveLobbyButton.addEventListener("click", () => {
+  localStorage.removeItem("garlicPhonePlayerId");
+  location.href = "/";
 });
 
-els.startDrawingButton.addEventListener("click", async () => {
-  try {
-    await api(`/api/rooms/${state.room.code}/start-drawing`, { adminId: state.adminId });
-  } catch (error) {
-    els.adminStageTitle.textContent = error.message;
-  }
-});
-
-els.openGalleryButton.addEventListener("click", async () => {
-  try {
-    await api(`/api/rooms/${state.room.code}/gallery`, { adminId: state.adminId });
-  } catch (error) {
-    els.adminStageTitle.textContent = error.message;
-  }
+[
+  els.maxPlayersSelect,
+  els.timePresetSelect,
+  els.turnsSelect,
+  els.keepDrawingSelect,
+  els.scoreboardToggle,
+  els.secrecySelect
+].forEach((control) => {
+  control.addEventListener("change", saveSettings);
 });
 
 els.copyInviteButton.addEventListener("click", async () => {
   if (!state.room) return;
   await navigator.clipboard.writeText(inviteUrl(state.room.code));
-  els.adminStageTitle.textContent = "초대 링크를 복사했어요.";
+  els.copyInviteButton.textContent = "복사됨";
+  window.setTimeout(() => {
+    els.copyInviteButton.textContent = "🔗 초대";
+  }, 1200);
 });
 
-els.joinButton.addEventListener("click", async () => {
+els.qrButton.addEventListener("click", () => {
+  if (!state.room) return;
+  els.inviteDialog.showModal();
+});
+
+els.closeInviteButton.addEventListener("click", () => {
+  els.inviteDialog.close();
+});
+
+els.qrImage.addEventListener("error", () => {
+  els.qrCanvas.classList.add("active");
+});
+
+els.qrImage.addEventListener("load", () => {
+  els.qrCanvas.classList.remove("active");
+});
+
+els.startGameButton.addEventListener("click", async () => {
   try {
-    const code = (els.joinCode.value || state.roomCode).trim().toUpperCase();
-    const data = await api(`/api/rooms/${code}/join`, { name: els.playerName.value });
-    setPlayer(data.room, data.playerId);
+    await api(`/api/rooms/${state.room.code}/start`, { playerId: state.playerId });
   } catch (error) {
-    setPlayerStatus(error.message);
+    setStatus(error.message);
   }
 });
 
@@ -486,44 +458,13 @@ els.submitDrawingButton.addEventListener("click", async () => {
 setInterval(() => {
   const remaining = state.room?.roundEndsAt ? Math.max(0, Math.ceil((state.room.roundEndsAt - Date.now()) / 1000)) : null;
   const text = remaining === null ? "--:--" : `${String(Math.floor(remaining / 60)).padStart(2, "0")}:${String(remaining % 60).padStart(2, "0")}`;
-  els.adminTimer.textContent = text;
   els.writeTimer.textContent = text;
   els.drawTimer.textContent = text;
 }, 250);
 
-function drawHero() {
-  const canvas = els.heroCanvas;
-  const hero = canvas.getContext("2d");
-  const ratio = window.devicePixelRatio || 1;
-  canvas.width = canvas.clientWidth * ratio;
-  canvas.height = canvas.clientHeight * ratio;
-  hero.scale(ratio, ratio);
-  hero.fillStyle = "#111827";
-  hero.fillRect(0, 0, canvas.clientWidth, canvas.clientHeight);
-  const colors = ["#67e8f9", "#fbbf24", "#f472b6", "#a7f3d0", "#f8fafc"];
-  for (let i = 0; i < 42; i += 1) {
-    const x = 80 + i * 44;
-    const y = 35 + ((i * 31) % 180);
-    hero.strokeStyle = colors[i % colors.length];
-    hero.lineWidth = 3 + (i % 5);
-    hero.beginPath();
-    hero.moveTo(x, y);
-    hero.bezierCurveTo(x + 30, y - 45, x + 90, y + 60, x + 128, y + 4);
-    hero.stroke();
-  }
-}
-
-drawHero();
-window.addEventListener("resize", drawHero);
-
-if (state.mode === "admin" && state.roomCode && state.adminId) {
-  connectEvents();
-  renderAdmin();
-} else if (state.roomCode) {
-  showView("joinView");
+if (state.roomCode) {
   els.joinCode.value = state.roomCode;
-  els.joinRoomCode.textContent = state.roomCode;
-} else {
-  showView("adminView");
-  drawQr("");
+  els.roomCodeField.classList.remove("hidden");
 }
+
+showScreen("homeView");
