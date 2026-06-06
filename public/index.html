@@ -87,14 +87,11 @@
               <button class="preset-card mode-card selected" data-mode="normal" type="button"><span>📝</span><strong>일반</strong><small>글쓰기와 그림 그리기</small></button>
               <button class="preset-card mode-card" data-mode="knockoff" type="button"><span>🧄</span><strong>녹아웃</strong><small>빠르게 이어지는 도전</small></button>
               <button class="preset-card mode-card" data-mode="animation" type="button"><span>🎞</span><strong>애니메이션</strong><small>장면을 이어서 만들기</small></button>
-              <button class="preset-card mode-card custom" data-mode="custom" type="button"><span>⚙</span><strong>커스텀</strong><small>직접 설정하기</small></button>
-              <button class="preset-card locked" type="button" disabled><span>🧊</span><strong>아이스브레이커</strong><small>준비 중</small></button>
-              <button class="preset-card locked" type="button" disabled><span>🎨</span><strong>명작</strong><small>준비 중</small></button>
             </div>
 
             <div id="customPane" class="settings-view custom-pane">
               <h2>전체 설정</h2>
-              <p id="customLockNote" class="locked-note">세부 설정은 프리셋에서 커스텀을 선택했을 때만 바꿀 수 있어요.</p>
+              <p id="customLockNote" class="locked-note">전체 설정을 열면 자동으로 커스텀 모드가 적용돼요.</p>
               <label class="setting-row"><span><strong>시간</strong><small>글쓰기와 그림 그리기의 속도를 정해요.</small></span><select id="timePresetSelect"><option value="fast">FAST</option><option value="normal" selected>NORMAL</option><option value="slow">SLOW</option><option value="regressive">REGRESSIVE</option><option value="progressive">PROGRESSIVE</option><option value="dynamic">DYNAMIC</option><option value="infinite">INFINITE</option><option value="host">HOST'S DECISION</option><option value="fasterFirst">FASTER FIRST TURN</option><option value="slowerFirst">SLOWER FIRST TURN</option></select></label>
               <label class="setting-row"><span><strong>작업 흐름</strong><small>갈릭폰은 일반 흐름으로 진행돼요.</small></span><select id="taskFlowSelect" disabled><option>글쓰기, 그림 그리기</option></select></label>
               <label class="setting-row"><span><strong>턴</strong><small>몇 번 이어서 진행할지 정해요.</small></span><select id="turnsSelect"><option value="few">FEW</option><option value="most">MOST</option><option value="all" selected>ALL</option><option value="allPlusOne">ALL +1</option><option value="double">200%</option><option value="triple">300%</option><option value="single">SINGLE TURN</option><option value="2">2 TURNS</option><option value="3">3 TURNS</option><option value="4">4 TURNS</option><option value="5">5 TURNS</option><option value="6">6 TURNS</option><option value="7">7 TURNS</option><option value="8">8 TURNS</option></select></label>
@@ -123,7 +120,7 @@
 
       <section id="writeView" class="screen play-screen">
         <header class="stage-header"><div><p>글쓰기</p><h2>다음 사람이 그릴 수 있는 문장을 써 주세요.</h2></div><div id="writeTimer" class="clock-timer"><span>--:--</span><i></i></div></header>
-        <div class="writing-page"><textarea id="writingInput" maxlength="100" placeholder="예: 비 오는 운동장에서 춤추는 고추"></textarea><button id="submitWritingButton" class="primary-action" type="button">글 제출</button><p id="writingStatus" class="status">100자 안으로 입력할 수 있어요.</p></div>
+        <div class="writing-page"><img id="writingReference" class="writing-reference" alt="이전 사람이 그린 그림" hidden /><textarea id="writingInput" maxlength="100" placeholder="예: 비 오는 운동장에서 춤추는 고추"></textarea><button id="submitWritingButton" class="primary-action" type="button">글 제출</button><p id="writingStatus" class="status">100자 안으로 입력할 수 있어요.</p></div>
       </section>
 
       <section id="drawView" class="screen draw-screen">

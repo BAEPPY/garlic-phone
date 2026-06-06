@@ -521,6 +521,15 @@ dialog::backdrop { background: rgba(84,44,18,.48); }
   to { transform: scale(1.06); }
 }
 textarea { min-height: 240px; padding: 18px; resize: vertical; font-size: 22px; line-height: 1.35; }
+.writing-reference {
+  width: min(520px, 100%);
+  max-height: 280px;
+  justify-self: center;
+  object-fit: contain;
+  border: 5px solid rgba(123,71,36,.35);
+  border-radius: 12px;
+  background: white;
+}
 .canvas-shell { width: 100%; aspect-ratio: 14 / 9; border: 6px solid var(--stroke); border-radius: 12px; overflow: hidden; background: white; }
 #drawCanvas { display: block; width: 100%; height: 100%; touch-action: none; }
 .tool-strip { margin-top: 14px; display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
@@ -537,16 +546,16 @@ textarea { min-height: 240px; padding: 18px; resize: vertical; font-size: 22px; 
 .gallery-card strong { font-size: 18px; }
 .gallery-card span { margin-top: 4px; color: var(--stroke); }
 .album-screen { min-height: 100vh; }
-.album-layout { display: grid; grid-template-columns: 430px 1fr; gap: 18px; height: calc(100vh - 96px); min-height: 640px; }
-.album-panel { display: grid; place-items: center; }
+.album-layout { display: grid; grid-template-columns: 430px 1fr; gap: 18px; min-height: calc(100vh - 96px); }
+.album-panel { display: grid; place-items: start center; overflow: auto; padding-bottom: 24px; }
 .album-settings, .album-viewer { width: min(760px, 100%); display: grid; gap: 18px; }
 .album-settings .primary-action { justify-self: center; }
 .album-row { width: 100%; border-color: rgba(37,127,89,.35); }
 .album-row.selected { background: #bdffd6; }
 .album-page {
-  min-height: 460px;
+  min-height: min(420px, 48vh);
   display: grid;
-  grid-template-rows: auto 1fr;
+  grid-template-rows: auto minmax(0, 1fr);
   gap: 14px;
   border: 4px solid rgba(123,71,36,.35);
   border-radius: 16px;
@@ -568,7 +577,7 @@ textarea { min-height: 240px; padding: 18px; resize: vertical; font-size: 22px; 
 #albumDrawing {
   width: 100%;
   height: 100%;
-  max-height: 520px;
+  max-height: 44vh;
   object-fit: contain;
   border-radius: 12px;
   background: white;

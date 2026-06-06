@@ -1,4 +1,4 @@
-const params = new URLSearchParams(location.search);
+﻿const params = new URLSearchParams(location.search);
 const savedPlayerId = localStorage.getItem("garlicPhonePlayerId") || "";
 const state = {
   playerId: savedPlayerId,
@@ -11,7 +11,10 @@ const state = {
   currentStroke: null,
   avatarIndex: Number(localStorage.getItem("garlicPhoneAvatar") || "0"),
   selectedAlbumIndex: 0,
-  albumAutoTimer: null
+  selectedAlbumStep: 0,
+  albumAutoTimer: null,
+  lastWritingTurn: -1,
+  lastDrawingTurn: -1
 };
 
 const $ = (selector) => document.querySelector(selector);
@@ -50,6 +53,7 @@ const els = {
   qrCanvas: $("#qrCanvas"),
   inviteLink: $("#inviteLink"),
   writeTimer: $("#writeTimer"),
+  writingReference: $("#writingReference"),
   writingInput: $("#writingInput"),
   submitWritingButton: $("#submitWritingButton"),
   writingStatus: $("#writingStatus"),
@@ -92,13 +96,24 @@ const promptSuggestions = [
   "운동장에서 춤추는 고추",
   "칠판 앞에 선 브로콜리 선생님",
   "비 오는 날 우산을 든 당근",
-  "소풍 가는 토마토 친구",
-  "달빛 아래 노래하는 가지",
+  "마법사가 된 토마토 친구",
+  "무지개 아래 노래하는 가지",
   "책을 읽는 감자 탐험가",
-  "파도가 치는 바다의 오이 배",
+  "파도가 치는 바다 위의 양파",
   "호박 마차를 탄 채소 왕",
-  "눈사람을 만든 양파"
+  "인사말을 만든 쪽파"
 ];
+
+const nicknameVeggies = [
+  "마늘", "파", "감자", "고추", "당근", "양파", "브로콜리", "토마토", "오이", "상추",
+  "배추", "무", "호박", "가지", "버섯", "옥수수", "피망", "양배추", "시금치", "깻잎",
+  "콩나물", "부추", "연근", "고구마", "완두콩"
+];
+
+function randomNickname() {
+  const veggie = nicknameVeggies[Math.floor(Math.random() * nicknameVeggies.length)];
+  return `${veggie}${Math.floor(1000 + Math.random() * 9000)}`;
+}
 
 function showScreen(id) {
   document.body.dataset.view = id;
@@ -120,7 +135,7 @@ function selectedMode() {
 function renderAvatar() {
   const index = normalizeAvatar(state.avatarIndex);
   els.veggieScene.className = "veggie-scene image-avatar";
-  els.veggieScene.innerHTML = `<img src="${avatarImages[index]}" alt="프로필 채소" />`;
+  els.veggieScene.innerHTML = `<img src="${avatarImages[index]}" alt="?꾨줈??梨꾩냼" />`;
 }
 
 function normalizeAvatar(value) {
@@ -161,7 +176,7 @@ async function api(path, body) {
     body: JSON.stringify(body)
   });
   const data = await res.json();
-  if (!res.ok) throw new Error(data.error || "요청에 실패했어요.");
+  if (!res.ok) throw new Error(data.error || "?붿껌???ㅽ뙣?덉뼱??");
   return data;
 }
 
@@ -174,7 +189,7 @@ function connectEvents() {
     render();
   };
   state.source.onerror = () => {
-    if (!state.room) setStatus("방 정보를 불러오지 못했어요.");
+    if (!state.room) setStatus("諛??뺣낫瑜?遺덈윭?ㅼ? 紐삵뻽?댁슂.");
   };
 }
 
@@ -228,11 +243,20 @@ function renderLobby() {
 
 function renderWriting() {
   showScreen("writeView");
+  if (state.lastWritingTurn !== state.room.turnIndex) {
+    els.writingInput.value = "";
+    state.lastWritingTurn = state.room.turnIndex;
+  }
+  const hasReference = Boolean(state.room.assignedDrawing);
+  els.writingReference.hidden = !hasReference;
+  if (hasReference) els.writingReference.src = state.room.assignedDrawing;
   els.submitWritingButton.disabled = Boolean(state.room.myWriting);
   els.writingInput.disabled = Boolean(state.room.myWriting);
   if (state.room.myWriting) {
     els.writingInput.value = state.room.myWriting;
     els.writingStatus.textContent = "제출했어요. 다른 사람들을 기다리는 중이에요.";
+  } else if (hasReference) {
+    els.writingStatus.textContent = "그림을 보고 떠오르는 제시어를 적어 주세요.";
   } else {
     els.writingStatus.textContent = "100자 안으로 입력할 수 있어요.";
   }
@@ -240,10 +264,15 @@ function renderWriting() {
 
 function renderDrawing() {
   showScreen("drawView");
-  els.drawingPrompt.textContent = state.room.assignedPrompt || "상상 한 장면";
+  if (state.lastDrawingTurn !== state.room.turnIndex) {
+    state.strokes = [];
+    paintBackground("#ffffff");
+    state.lastDrawingTurn = state.room.turnIndex;
+  }
+  els.drawingPrompt.textContent = state.room.assignedPrompt || "상상 속 장면";
   els.forceWritingButton.hidden = state.room.hostId !== state.playerId;
   els.submitDrawingButton.disabled = Boolean(state.room.myDrawing);
-  els.drawingStatus.textContent = state.room.myDrawing ? "제출했어요. 결과를 기다리는 중이에요." : "";
+  els.drawingStatus.textContent = state.room.myDrawing ? "제출했어요. 다음 턴을 기다리는 중이에요." : "";
 }
 
 function renderGalleryScreen() {
@@ -251,6 +280,7 @@ function renderGalleryScreen() {
   els.albumSettings.hidden = false;
   els.albumViewer.hidden = true;
   window.clearInterval(state.albumAutoTimer);
+  state.selectedAlbumStep = 0;
   renderAlbumList();
 }
 
@@ -269,9 +299,10 @@ function renderAlbumList() {
     const button = document.createElement("button");
     button.className = `player-row album-row${index === state.selectedAlbumIndex ? " selected" : ""}`;
     button.type = "button";
-    button.innerHTML = `<span class="player-icon">${avatarHtml(album.authorAvatar ?? index, `${album.authorName} 프로필`)}</span><span>${escapeHtml(album.authorName)}의 앨범</span><span>${album.drawings.length}</span>`;
+    button.innerHTML = `<span class="player-icon">${avatarHtml(album.authorAvatar ?? index, `${album.authorName} 프로필`)}</span><span>${escapeHtml(album.authorName)}의 앨범</span><span>${album.steps?.length || 0}</span>`;
     button.addEventListener("click", () => {
       state.selectedAlbumIndex = index;
+      state.selectedAlbumStep = 0;
       showAlbumViewer();
       renderSelectedAlbum();
       restartAlbumAuto();
@@ -289,10 +320,18 @@ function renderSelectedAlbum() {
   const albums = orderedAlbums();
   const album = albums[state.selectedAlbumIndex];
   if (!album) return;
-  const drawing = album.drawings[0] || {};
+  const steps = album.steps?.length ? album.steps : [];
+  if (state.selectedAlbumStep >= steps.length) state.selectedAlbumStep = 0;
+  const step = steps[state.selectedAlbumStep] || {};
   els.albumTitle.textContent = `${album.authorName}의 앨범`;
-  els.albumPrompt.textContent = album.prompt || "제시어가 없어요.";
-  els.albumDrawing.src = drawing.drawing || "";
+  els.albumPrompt.textContent = step.type === "drawing"
+    ? step.prompt || album.prompt || "제시어가 없어요."
+    : step.text || album.prompt || "제시어가 없어요.";
+  const drawing = step.type === "drawing" ? step.drawing : "";
+  els.albumDrawing.hidden = !drawing;
+  els.albumDrawing.src = drawing || "";
+  els.prevAlbumButton.disabled = steps.length <= 1;
+  els.nextAlbumButton.disabled = steps.length <= 1;
   renderAlbumList();
 }
 
@@ -301,10 +340,11 @@ function orderedAlbums() {
   return els.albumReverseToggle.checked ? albums.reverse() : albums;
 }
 
-function moveAlbum(step) {
-  const albums = orderedAlbums();
-  if (!albums.length) return;
-  state.selectedAlbumIndex = (state.selectedAlbumIndex + step + albums.length) % albums.length;
+function moveAlbumStep(step) {
+  const album = currentAlbum();
+  const steps = album?.steps || [];
+  if (!steps.length) return;
+  state.selectedAlbumStep = (state.selectedAlbumStep + step + steps.length) % steps.length;
   renderSelectedAlbum();
 }
 
@@ -314,7 +354,8 @@ function currentAlbum() {
 
 function saveCurrentAlbum() {
   const album = currentAlbum();
-  const drawing = album?.drawings?.[0]?.drawing;
+  const step = album?.steps?.[state.selectedAlbumStep];
+  const drawing = step?.drawing || album?.drawings?.[0]?.drawing;
   if (!drawing) return;
   const link = document.createElement("a");
   link.href = drawing;
@@ -327,7 +368,7 @@ function saveCurrentAlbum() {
 function restartAlbumAuto() {
   window.clearInterval(state.albumAutoTimer);
   if (!els.displayAutoToggle.checked || els.albumViewer.hidden) return;
-  state.albumAutoTimer = window.setInterval(() => moveAlbum(1), Number(els.albumSpeedSelect.value));
+  state.albumAutoTimer = window.setInterval(() => moveAlbumStep(1), Number(els.albumSpeedSelect.value));
 }
 
 function setControlsDisabled(disabled) {
@@ -377,7 +418,7 @@ function drawQrFallback(text) {
   qr.fillStyle = "#32156b";
   qr.font = "800 15px sans-serif";
   qr.textAlign = "center";
-  qr.fillText("QR이 안 보이면", 110, 102);
+  qr.fillText("QR이 보이지 않으면", 110, 102);
   qr.fillText("링크를 복사해 주세요", 110, 126);
   if (!text) return;
   let seed = 0;
@@ -458,12 +499,14 @@ function updateClock(element, totalSeconds, finalNumber = false) {
 }
 
 els.presetTab.addEventListener("click", () => showSettingsPane("preset"));
-els.customTab.addEventListener("click", () => showSettingsPane("custom"));
+els.customTab.addEventListener("click", () => {
+  showSettingsPane("custom");
+  saveSettings({ mode: "custom" });
+});
 
 els.modeButtons.forEach((button) => {
   button.addEventListener("click", () => {
     els.modeButtons.forEach((item) => item.classList.toggle("selected", item === button));
-    if (button.dataset.mode === "custom") showSettingsPane("custom");
     saveSettings({ mode: selectedMode() });
   });
 });
@@ -476,7 +519,7 @@ els.randomNameButton.addEventListener("click", () => {
 
 els.enterButton.addEventListener("click", async () => {
   try {
-    const name = els.playerName.value.trim() || `마늘친구${Math.floor(1000 + Math.random() * 9000)}`;
+    const name = els.playerName.value.trim() || randomNickname();
     const code = (els.joinCode.value || state.roomCode).trim().toUpperCase();
     const data = code
       ? await api(`/api/rooms/${code}/join`, { name, avatar: state.avatarIndex })
@@ -506,7 +549,7 @@ els.copyInviteButton.addEventListener("click", async () => {
   await navigator.clipboard.writeText(inviteUrl(state.room.code));
   els.copyInviteButton.textContent = "복사됨";
   window.setTimeout(() => {
-    els.copyInviteButton.textContent = "🔗 초대";
+    els.copyInviteButton.textContent = "초대";
   }, 1200);
 });
 
@@ -623,17 +666,18 @@ els.submitDrawingButton.addEventListener("click", async () => {
 els.startAlbumButton.addEventListener("click", () => {
   showAlbumViewer();
   state.selectedAlbumIndex = 0;
+  state.selectedAlbumStep = 0;
   renderSelectedAlbum();
   restartAlbumAuto();
 });
 
 els.prevAlbumButton.addEventListener("click", () => {
-  moveAlbum(-1);
+  moveAlbumStep(-1);
   restartAlbumAuto();
 });
 
 els.nextAlbumButton.addEventListener("click", () => {
-  moveAlbum(1);
+  moveAlbumStep(1);
   restartAlbumAuto();
 });
 
