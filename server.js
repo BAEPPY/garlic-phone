@@ -6,9 +6,19 @@ const crypto = require("crypto");
 const publicDir = path.join(__dirname, "public");
 const port = Number(process.env.PORT || 4173);
 const rooms = new Map();
+const modes = new Set(["normal", "knockoff", "animation", "custom"]);
+const timeModes = new Set(["fast", "normal", "slow", "regressive", "progressive", "dynamic", "infinite", "host", "fasterFirst", "slowerFirst"]);
+const turnModes = new Set(["few", "most", "all", "allPlusOne", "double", "triple", "single", "2", "3", "4", "5", "6", "7", "8"]);
 
-function id(size = 8) {
-  return crypto.randomBytes(size).toString("base64url").slice(0, size).toUpperCase();
+function id(size = 8, mixed = false) {
+  const letters = "ABCDEFGHJKLMNPQRSTUVWXYZ";
+  const numbers = "23456789";
+  const alphabet = `${letters}${numbers}`;
+  let value = "";
+  do {
+    value = Array.from(crypto.randomBytes(size), (byte) => alphabet[byte % alphabet.length]).join("");
+  } while (mixed && (!/[A-Z]/.test(value) || !/[0-9]/.test(value)));
+  return value;
 }
 
 function json(res, status, data) {
@@ -45,29 +55,42 @@ function clamp(value, min, max, fallback) {
   return Math.max(min, Math.min(max, number));
 }
 
+function timeSeconds(timeMode) {
+  if (timeMode === "fast") return { writeSeconds: 45, drawSeconds: 60 };
+  if (timeMode === "slow") return { writeSeconds: 120, drawSeconds: 150 };
+  if (timeMode === "infinite") return { writeSeconds: 300, drawSeconds: 300 };
+  return { writeSeconds: 75, drawSeconds: 90 };
+}
+
 function makeSettings(settings = {}) {
+  const timeMode = timeModes.has(settings.timeMode) ? settings.timeMode : "normal";
+  const seconds = timeSeconds(timeMode);
   return {
     maxPlayers: clamp(settings.maxPlayers, 2, 30, 14),
-    writeSeconds: clamp(settings.writeSeconds, 30, 180, 75),
-    drawSeconds: clamp(settings.drawSeconds, 30, 300, 90),
-    turns: settings.turns === "one" ? "one" : "all",
+    timeMode,
+    writeSeconds: seconds.writeSeconds,
+    drawSeconds: seconds.drawSeconds,
+    turns: turnModes.has(settings.turns) ? settings.turns : "all",
     keepDrawing: Boolean(settings.keepDrawing),
-    scoreboard: Boolean(settings.scoreboard),
-    secrecy: settings.secrecy === "private" ? "private" : "public"
+    secrecy: settings.secrecy === "private" ? "private" : "public",
+    sound: settings.sound === false ? false : true
   };
 }
 
 function makeRoom(hostName, settings) {
-  const roomCode = id(6);
+  const roomCode = id(6, true);
   const hostId = id(12);
+  const mode = modes.has(settings?.mode) ? settings.mode : "normal";
   const room = {
     code: roomCode,
     hostId,
     settings: makeSettings(settings),
-    mode: "normal",
+    mode,
     stage: "lobby",
+    nextStage: "",
+    countdownEndsAt: 0,
     roundEndsAt: 0,
-    players: [{ id: hostId, name: hostName, joinedAt: Date.now(), prompt: "" }],
+    players: [{ id: hostId, name: hostName, joinedAt: Date.now(), prompt: "", promptAuthorId: "", promptAuthorName: "" }],
     writings: [],
     drawings: [],
     events: new Set()
@@ -88,15 +111,43 @@ function publicRoom(room, clientId = "") {
     settings: room.settings,
     mode: room.mode,
     stage: room.stage,
+    nextStage: room.nextStage,
+    countdownEndsAt: room.countdownEndsAt,
     roundEndsAt: room.roundEndsAt,
     players: room.players.map(({ id, name }) => ({ id, name })),
     writingCount: room.writings.length,
     drawingCount: room.drawings.length,
     gallery: room.stage === "gallery" ? room.drawings : [],
+    albums: room.stage === "gallery" ? makeAlbums(room) : [],
     myWriting: room.writings.find((item) => item.playerId === clientId)?.text || "",
     myDrawing: room.drawings.find((item) => item.playerId === clientId)?.drawing || "",
     assignedPrompt: player?.prompt || ""
   };
+}
+
+function makeAlbums(room) {
+  const albumMap = new Map();
+  for (const writing of room.writings) {
+    albumMap.set(writing.playerId, {
+      authorId: writing.playerId,
+      authorName: writing.name,
+      prompt: writing.text,
+      drawings: []
+    });
+  }
+  for (const drawing of room.drawings) {
+    const authorId = drawing.promptAuthorId || drawing.playerId;
+    if (!albumMap.has(authorId)) {
+      albumMap.set(authorId, {
+        authorId,
+        authorName: drawing.promptAuthorName || drawing.name,
+        prompt: drawing.prompt || "",
+        drawings: []
+      });
+    }
+    albumMap.get(authorId).drawings.push(drawing);
+  }
+  return [...albumMap.values()];
 }
 
 function publish(room) {
@@ -114,25 +165,41 @@ function requireHost(room, body, res) {
 }
 
 function assignPrompts(room) {
-  const texts = room.writings.map((item) => item.text).filter(Boolean);
+  const writings = room.writings.filter((item) => item.text);
   room.players.forEach((player, index) => {
-    player.prompt = texts.length ? texts[index % texts.length] : "상상 속 장면";
+    const writing = writings[index % writings.length];
+    player.prompt = writing ? writing.text : "상상 속 장면";
+    player.promptAuthorId = writing ? writing.playerId : "";
+    player.promptAuthorName = writing ? writing.name : "";
   });
+}
+
+function startCountdown(room, nextStage) {
+  room.stage = "countdown";
+  room.nextStage = nextStage;
+  room.countdownEndsAt = Date.now() + 3000;
+  room.roundEndsAt = 0;
 }
 
 function startWriting(room) {
   room.stage = "writing";
+  room.nextStage = "";
+  room.countdownEndsAt = 0;
   room.roundEndsAt = Date.now() + room.settings.writeSeconds * 1000;
   room.writings = [];
   room.drawings = [];
   room.players.forEach((player) => {
     player.prompt = "";
+    player.promptAuthorId = "";
+    player.promptAuthorName = "";
   });
 }
 
 function startDrawing(room) {
   assignPrompts(room);
   room.stage = "drawing";
+  room.nextStage = "";
+  room.countdownEndsAt = 0;
   room.roundEndsAt = Date.now() + room.settings.drawSeconds * 1000;
   room.drawings = [];
 }
@@ -145,7 +212,7 @@ async function handleApi(req, res) {
     if (req.method === "POST" && url.pathname === "/api/rooms") {
       const body = await readBody(req);
       const name = String(body.name || "플레이어").trim().slice(0, 18) || "플레이어";
-      const { room, playerId } = makeRoom(name, body.settings);
+      const { room, playerId } = makeRoom(name, { ...body.settings, mode: body.mode });
       json(res, 200, { playerId, room: publicRoom(room, playerId) });
       publish(room);
       return;
@@ -159,7 +226,7 @@ async function handleApi(req, res) {
       const body = await readBody(req);
       const name = String(body.name || "플레이어").trim().slice(0, 18) || "플레이어";
       const playerId = id(12);
-      room.players.push({ id: playerId, name, joinedAt: Date.now(), prompt: "" });
+      room.players.push({ id: playerId, name, joinedAt: Date.now(), prompt: "", promptAuthorId: "", promptAuthorName: "" });
       json(res, 200, { playerId, room: publicRoom(room, playerId) });
       publish(room);
       return;
@@ -171,6 +238,7 @@ async function handleApi(req, res) {
       const body = await readBody(req);
       if (!requireHost(room, body, res)) return;
       if (room.stage !== "lobby") return json(res, 400, { error: "시작 전 대기실에서만 설정할 수 있어요." });
+      if (modes.has(body.mode)) room.mode = body.mode;
       const next = makeSettings({ ...room.settings, ...body.settings });
       next.maxPlayers = Math.max(room.players.length, next.maxPlayers);
       room.settings = next;
@@ -185,7 +253,7 @@ async function handleApi(req, res) {
       const body = await readBody(req);
       if (!requireHost(room, body, res)) return;
       if (room.players.length < 1) return json(res, 400, { error: "참가자가 들어온 뒤 시작할 수 있어요." });
-      startWriting(room);
+      startCountdown(room, "writing");
       json(res, 200, { room: publicRoom(room, body.playerId) });
       publish(room);
       return;
@@ -213,7 +281,7 @@ async function handleApi(req, res) {
       if (!text) return json(res, 400, { error: "글을 입력해 주세요." });
       room.writings = room.writings.filter((item) => item.playerId !== player.id);
       room.writings.push({ playerId: player.id, name: player.name, text, submittedAt: Date.now() });
-      if (room.writings.length >= room.players.length) startDrawing(room);
+      if (room.writings.length >= room.players.length) startCountdown(room, "drawing");
       json(res, 200, { room: publicRoom(room, player.id) });
       publish(room);
       return;
@@ -233,6 +301,8 @@ async function handleApi(req, res) {
         playerId: player.id,
         name: player.name,
         prompt: player.prompt,
+        promptAuthorId: player.promptAuthorId,
+        promptAuthorName: player.promptAuthorName,
         drawing,
         submittedAt: Date.now()
       });
@@ -312,8 +382,13 @@ function serveStatic(req, res) {
 
 setInterval(() => {
   for (const room of rooms.values()) {
+    if (room.stage === "countdown" && room.countdownEndsAt && Date.now() > room.countdownEndsAt) {
+      if (room.nextStage === "drawing") startDrawing(room);
+      else startWriting(room);
+      publish(room);
+    }
     if (room.stage === "writing" && room.roundEndsAt && Date.now() > room.roundEndsAt) {
-      startDrawing(room);
+      startCountdown(room, "drawing");
       publish(room);
     }
     if (room.stage === "drawing" && room.roundEndsAt && Date.now() > room.roundEndsAt) {
