@@ -14,7 +14,8 @@ const state = {
   selectedAlbumStep: 0,
   albumAutoTimer: null,
   lastWritingTurn: -1,
-  lastDrawingTurn: -1
+  lastDrawingTurn: -1,
+  autoSubmittingDrawing: false
 };
 
 const $ = (selector) => document.querySelector(selector);
@@ -248,8 +249,13 @@ function renderWriting() {
     state.lastWritingTurn = state.room.turnIndex;
   }
   const hasReference = Boolean(state.room.assignedDrawing);
-  els.writingReference.hidden = !hasReference;
-  if (hasReference) els.writingReference.src = state.room.assignedDrawing;
+  if (hasReference) {
+    els.writingReference.src = state.room.assignedDrawing;
+    els.writingReference.removeAttribute("hidden");
+  } else {
+    els.writingReference.setAttribute("hidden", "");
+    els.writingReference.removeAttribute("src");
+  }
   els.submitWritingButton.disabled = Boolean(state.room.myWriting);
   els.writingInput.disabled = Boolean(state.room.myWriting);
   if (state.room.myWriting) {
@@ -328,8 +334,13 @@ function renderSelectedAlbum() {
     ? step.prompt || album.prompt || "제시어가 없어요."
     : step.text || album.prompt || "제시어가 없어요.";
   const drawing = step.type === "drawing" ? step.drawing : "";
-  els.albumDrawing.hidden = !drawing;
-  els.albumDrawing.src = drawing || "";
+  if (drawing) {
+    els.albumDrawing.src = drawing;
+    els.albumDrawing.removeAttribute("hidden");
+  } else {
+    els.albumDrawing.setAttribute("hidden", "");
+    els.albumDrawing.removeAttribute("src");
+  }
   els.prevAlbumButton.disabled = steps.length <= 1;
   els.nextAlbumButton.disabled = steps.length <= 1;
   renderAlbumList();
@@ -474,6 +485,25 @@ function redraw() {
 
 function canDraw() {
   return state.room?.stage === "drawing" && !state.room.myDrawing;
+}
+
+async function submitCurrentDrawing(auto = false) {
+  if (!state.room || state.room.stage !== "drawing" || state.room.myDrawing || state.autoSubmittingDrawing) return;
+  state.autoSubmittingDrawing = true;
+  els.submitDrawingButton.disabled = true;
+  if (auto) els.drawingStatus.textContent = "시간이 끝나서 현재 그림을 저장하고 있어요.";
+  try {
+    const data = await api(`/api/rooms/${state.room.code}/submit-drawing`, {
+      playerId: state.playerId,
+      drawing: els.drawCanvas.toDataURL("image/webp", 0.75)
+    });
+    state.room = data.room;
+    render();
+  } catch (error) {
+    if (!auto) els.drawingStatus.textContent = error.message;
+  } finally {
+    state.autoSubmittingDrawing = false;
+  }
 }
 
 async function saveSettings(extra = {}) {
@@ -651,16 +681,7 @@ els.clearButton.addEventListener("click", () => {
 });
 
 els.submitDrawingButton.addEventListener("click", async () => {
-  try {
-    const data = await api(`/api/rooms/${state.room.code}/submit-drawing`, {
-      playerId: state.playerId,
-      drawing: els.drawCanvas.toDataURL("image/png")
-    });
-    state.room = data.room;
-    render();
-  } catch (error) {
-    els.drawingStatus.textContent = error.message;
-  }
+  submitCurrentDrawing(false);
 });
 
 els.startAlbumButton.addEventListener("click", () => {
@@ -699,6 +720,10 @@ setInterval(() => {
   renderCountdown();
   updateClock(els.writeTimer, state.room?.settings?.writeSeconds || 1);
   updateClock(els.drawTimer, state.room?.settings?.drawSeconds || 1, state.room?.stage === "drawing");
+  if (state.room?.stage === "drawing" && !state.room.myDrawing && state.room.roundEndsAt) {
+    const millisecondsLeft = state.room.roundEndsAt - Date.now();
+    if (millisecondsLeft <= 1200) submitCurrentDrawing(true);
+  }
 }, 250);
 
 if (state.roomCode) {
