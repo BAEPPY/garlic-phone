@@ -42,6 +42,7 @@ button { cursor: pointer; }
   background: rgba(74,42,20,.58);
   backdrop-filter: blur(2px);
 }
+.countdown-overlay[hidden] { display: none !important; }
 .countdown-card {
   position: relative;
   width: min(440px, 70vw);
@@ -238,6 +239,83 @@ button { cursor: pointer; }
 }
 .veg.broccoli::before { top: 50%; left: 25%; }
 .veg.broccoli::after { top: 68%; left: 40%; }
+.veg.tomato {
+  left: 42px;
+  top: 122px;
+  width: 92px;
+  height: 78px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 32% 25%, #ff9c7c, #e54532 58%, #a92723);
+  z-index: 3;
+}
+.veg.tomato::before { top: 36%; left: 28%; }
+.veg.tomato::after { top: 58%; left: 42%; }
+.veg.eggplant {
+  right: 18px;
+  top: 102px;
+  width: 94px;
+  height: 72px;
+  border-radius: 48px 22px 48px 22px;
+  background: radial-gradient(circle at 32% 24%, #b99cff, #6e45b8 62%, #45246f);
+  transform: rotate(17deg);
+  z-index: 3;
+}
+.veg.eggplant::before { top: 35%; left: 27%; }
+.veg.eggplant::after { top: 57%; left: 42%; }
+.veg.potato {
+  left: 58px;
+  top: 82px;
+  width: 102px;
+  height: 92px;
+  border-radius: 48% 52% 46% 54%;
+  background: radial-gradient(circle at 35% 26%, #ffe0a8, #c98545 65%, #965d32);
+  transform: rotate(-8deg);
+  z-index: 3;
+}
+.veg.cucumber {
+  left: 28px;
+  top: 104px;
+  width: 132px;
+  height: 60px;
+  border-radius: 44px;
+  background: radial-gradient(circle at 28% 24%, #b7ef8c, #4da757 62%, #257f59);
+  transform: rotate(-14deg);
+  z-index: 3;
+}
+.veg.cucumber::before { top: 33%; left: 28%; }
+.veg.cucumber::after { top: 56%; left: 42%; }
+.veg.pumpkin {
+  left: 56px;
+  top: 84px;
+  width: 110px;
+  height: 94px;
+  border-radius: 46%;
+  background:
+    linear-gradient(90deg, transparent 22%, rgba(122,68,23,.22) 23%, transparent 27%, transparent 47%, rgba(122,68,23,.18) 48%, transparent 52%, transparent 72%, rgba(122,68,23,.22) 73%, transparent 77%),
+    radial-gradient(circle at 35% 25%, #ffd48d, #e98a2d 62%, #b85d22);
+  z-index: 3;
+}
+.avatar-0 .onion { left: 18px; top: 58px; }
+.avatar-0 .pepper { left: 4px; top: 132px; }
+.avatar-0 .carrot { right: 8px; top: 132px; }
+.avatar-1 .garlic { left: 44px; top: 16px; transform: rotate(-10deg); }
+.avatar-1 .tomato { left: 88px; top: 118px; }
+.avatar-2 .potato { left: 70px; top: 48px; }
+.avatar-2 .pepper { left: 16px; top: 134px; }
+.avatar-3 .cucumber { left: 36px; top: 82px; }
+.avatar-3 .carrot { right: 16px; top: 132px; }
+.avatar-4 .eggplant { right: 54px; top: 72px; }
+.avatar-4 .broccoli { right: 18px; top: 30px; }
+.avatar-5 .pumpkin { left: 46px; top: 72px; }
+.avatar-5 .tomato { left: 116px; top: 124px; }
+.avatar-6 .garlic { left: 84px; top: 16px; }
+.avatar-6 .cucumber { left: 20px; top: 126px; }
+.avatar-7 .onion { left: 56px; top: 42px; }
+.avatar-7 .eggplant { right: 10px; top: 122px; }
+.avatar-8 .broccoli { right: 84px; top: 28px; }
+.avatar-8 .potato { left: 82px; top: 102px; }
+.avatar-9 .pepper { left: 28px; top: 82px; }
+.avatar-9 .pumpkin { left: 92px; top: 104px; }
 .veggie-badge button { position: absolute; right: -12px; bottom: 20px; width: 58px; height: 58px; border: 4px solid var(--stroke); border-radius: 50%; background: var(--cream); color: var(--green); font-size: 32px; font-weight: 950; }
 .join-form, .room-code-field, .writing-page { display: grid; gap: 12px; text-align: center; font-size: 26px; font-weight: 950; }
 .join-form input, .panel select, .setting-row select, textarea, #inviteLink {
@@ -314,6 +392,8 @@ dialog::backdrop { background: rgba(84,44,18,.48); }
 .stage-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 16px; }
 .stage-header p { margin: 0 0 6px; color: var(--green); font-size: 22px; font-weight: 950; }
 .stage-header h2 { margin: 0; font-size: 28px; line-height: 1.25; }
+.stage-actions { display: flex; align-items: center; gap: 14px; }
+.host-only-action { min-width: 92px; font-size: 24px; background: linear-gradient(180deg, #fff8e8, #ffd89e); }
 .clock-timer {
   --progress: 0deg;
   position: relative;
@@ -351,6 +431,21 @@ dialog::backdrop { background: rgba(84,44,18,.48); }
   transform-origin: 50% 0;
   transform: rotate(var(--progress));
   z-index: 2;
+}
+.clock-timer.final-count {
+  background: radial-gradient(circle at 35% 24%, #fffdf3, #ffd1b7 70%);
+  border-color: var(--red);
+  animation: finalPulse .45s ease-in-out infinite alternate;
+}
+.clock-timer.final-count::before, .clock-timer.final-count i { display: none; }
+.clock-timer.final-count span {
+  font-size: 58px;
+  color: var(--red);
+  text-shadow: 0 4px 0 rgba(84,44,18,.3);
+}
+@keyframes finalPulse {
+  from { transform: scale(1); }
+  to { transform: scale(1.06); }
 }
 textarea { min-height: 240px; padding: 18px; resize: vertical; font-size: 22px; line-height: 1.35; }
 .canvas-shell { width: 100%; aspect-ratio: 14 / 9; border: 6px solid var(--stroke); border-radius: 12px; overflow: hidden; background: white; }
@@ -420,7 +515,7 @@ textarea { min-height: 240px; padding: 18px; resize: vertical; font-size: 22px; 
   .primary-action, .secondary-action { width: 100%; min-width: 0; }
   .sound-switch { min-width: 150px; }
   .preset-pane.active { grid-template-columns: 1fr; }
-  .lobby-actions, .stage-header { flex-direction: column; }
+  .lobby-actions, .stage-header, .stage-actions { flex-direction: column; }
   .clock-timer { width: 100%; max-width: 116px; align-self: center; }
   .album-controls { flex-direction: column; }
 }

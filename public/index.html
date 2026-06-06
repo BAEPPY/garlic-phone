@@ -132,7 +132,7 @@
       </section>
 
       <section id="drawView" class="screen draw-screen">
-        <header class="stage-header"><div><p>그리기</p><h2 id="drawingPrompt">제시어를 기다리는 중이에요.</h2></div><div id="drawTimer" class="clock-timer"><span>--:--</span><i></i></div></header>
+        <header class="stage-header"><div><p>그리기</p><h2 id="drawingPrompt">제시어를 기다리는 중이에요.</h2></div><div class="stage-actions"><button id="forceWritingButton" class="secondary-action host-only-action" type="button">강제 전환</button><div id="drawTimer" class="clock-timer"><span>--:--</span><i></i></div></div></header>
         <div class="canvas-shell"><canvas id="drawCanvas" width="1120" height="720"></canvas></div>
         <div class="tool-strip"><div class="segmented" role="group" aria-label="그리기 도구"><button class="tool active" data-tool="pencil" title="연필" type="button">✎</button><button class="tool" data-tool="bucket" title="페인트 통" type="button">▣</button><button class="tool" data-tool="eraser" title="지우개" type="button">⌫</button></div><input id="colorInput" type="color" value="#4a2a14" title="색상" aria-label="색상" /><input id="sizeInput" type="range" min="2" max="40" value="8" title="크기" aria-label="크기" /><button id="undoButton" class="secondary-action" title="되돌리기" type="button">↶</button><button id="clearButton" class="secondary-action" title="전체 지우기" type="button">전체 지우기</button><button id="submitDrawingButton" class="primary-action" type="button">그림 제출</button></div>
         <p id="drawingStatus" class="status"></p>

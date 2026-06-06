@@ -9,6 +9,7 @@ const state = {
   drawing: false,
   strokes: [],
   currentStroke: null,
+  avatarIndex: Number(localStorage.getItem("garlicPhoneAvatar") || "0"),
   selectedAlbumIndex: 0,
   albumAutoTimer: null
 };
@@ -23,6 +24,7 @@ const els = {
   roomCodeField: $("#roomCodeField"),
   enterButton: $("#enterButton"),
   randomNameButton: $("#randomNameButton"),
+  veggieScene: $(".veggie-scene"),
   homeStatus: $("#homeStatus"),
   leaveLobbyButton: $("#leaveLobbyButton"),
   playerCount: $("#playerCount"),
@@ -53,6 +55,7 @@ const els = {
   writingStatus: $("#writingStatus"),
   drawingPrompt: $("#drawingPrompt"),
   drawTimer: $("#drawTimer"),
+  forceWritingButton: $("#forceWritingButton"),
   drawCanvas: $("#drawCanvas"),
   colorInput: $("#colorInput"),
   sizeInput: $("#sizeInput"),
@@ -81,8 +84,19 @@ ctx.lineCap = "round";
 ctx.lineJoin = "round";
 paintBackground("#ffffff");
 
-const names = ["마늘선생님", "쪽파요정", "고추대장", "당근탐험가", "브로콜리박사", "가지화가", "토마토친구"];
-const playerIcons = ["🧄", "🧅", "🌶", "🥕", "🥦", "🍆", "🍅"];
+const playerIcons = ["🧄", "🧅", "🌶", "🥕", "🥦", "🍆", "🍅", "🥔", "🥒", "🎃"];
+const avatarSets = [
+  ["garlic", "onion", "pepper", "carrot", "broccoli"],
+  ["garlic", "tomato", "carrot"],
+  ["potato", "pepper", "broccoli"],
+  ["cucumber", "carrot", "tomato"],
+  ["eggplant", "broccoli", "onion"],
+  ["pumpkin", "tomato", "garlic"],
+  ["garlic", "cucumber", "pepper"],
+  ["onion", "eggplant", "carrot"],
+  ["broccoli", "potato", "tomato"],
+  ["pepper", "pumpkin", "cucumber"]
+];
 
 function showScreen(id) {
   els.screens.forEach((screen) => screen.classList.toggle("active", screen.id === id));
@@ -98,6 +112,12 @@ function showSettingsPane(name) {
 
 function selectedMode() {
   return els.modeButtons.find((button) => button.classList.contains("selected"))?.dataset.mode || "normal";
+}
+
+function renderAvatar() {
+  const index = ((state.avatarIndex % avatarSets.length) + avatarSets.length) % avatarSets.length;
+  els.veggieScene.className = `veggie-scene avatar-${index}`;
+  els.veggieScene.innerHTML = avatarSets[index].map((type) => `<b class="veg ${type}"></b>`).join("");
 }
 
 function settingFromControls() {
@@ -150,6 +170,7 @@ function enterRoom(room, playerId) {
   state.roomCode = room.code;
   state.room = room;
   localStorage.setItem("garlicPhonePlayerId", playerId);
+  localStorage.setItem("garlicPhoneAvatar", String(state.avatarIndex));
   history.replaceState(null, "", `/?room=${room.code}`);
   connectEvents();
   render();
@@ -207,6 +228,7 @@ function renderWriting() {
 function renderDrawing() {
   showScreen("drawView");
   els.drawingPrompt.textContent = state.room.assignedPrompt || "상상 한 장면";
+  els.forceWritingButton.hidden = state.room.hostId !== state.playerId;
   els.submitDrawingButton.disabled = Boolean(state.room.myDrawing);
   els.drawingStatus.textContent = state.room.myDrawing ? "제출했어요. 결과를 기다리는 중이에요." : "";
 }
@@ -289,7 +311,7 @@ function renderPlayers(players, maxPlayers, hostId) {
     const player = players[i];
     const row = document.createElement("div");
     row.className = `player-row${player ? "" : " empty"}`;
-    const icon = playerIcons[i % playerIcons.length];
+    const icon = playerIcons[(player?.avatar ?? i) % playerIcons.length];
     row.innerHTML = player
       ? `<span class="player-icon">${icon}</span><span>${escapeHtml(player.name)}</span><span>${player.id === hostId ? "방장" : ""}</span>`
       : `<span class="player-icon">+</span><span>EMPTY</span><span></span>`;
@@ -389,11 +411,13 @@ async function saveSettings(extra = {}) {
   }
 }
 
-function updateClock(element, totalSeconds) {
+function updateClock(element, totalSeconds, finalNumber = false) {
   const remaining = state.room?.roundEndsAt ? Math.max(0, Math.ceil((state.room.roundEndsAt - Date.now()) / 1000)) : null;
   const text = remaining === null ? "--:--" : `${String(Math.floor(remaining / 60)).padStart(2, "0")}:${String(remaining % 60).padStart(2, "0")}`;
   const progress = remaining === null ? 0 : 1 - remaining / Math.max(1, totalSeconds);
-  element.querySelector("span").textContent = text;
+  const showFinal = finalNumber && remaining !== null && remaining <= 10;
+  element.classList.toggle("final-count", showFinal);
+  element.querySelector("span").textContent = showFinal ? String(remaining) : text;
   element.style.setProperty("--progress", `${Math.min(1, Math.max(0, progress)) * 360}deg`);
 }
 
@@ -409,7 +433,9 @@ els.modeButtons.forEach((button) => {
 });
 
 els.randomNameButton.addEventListener("click", () => {
-  els.playerName.value = names[Math.floor(Math.random() * names.length)];
+  state.avatarIndex = (state.avatarIndex + 1) % avatarSets.length;
+  localStorage.setItem("garlicPhoneAvatar", String(state.avatarIndex));
+  renderAvatar();
 });
 
 els.enterButton.addEventListener("click", async () => {
@@ -421,8 +447,8 @@ els.enterButton.addEventListener("click", async () => {
     }
     const code = (els.joinCode.value || state.roomCode).trim().toUpperCase();
     const data = code
-      ? await api(`/api/rooms/${code}/join`, { name })
-      : await api("/api/rooms", { name, settings: settingFromControls(), mode: selectedMode() });
+      ? await api(`/api/rooms/${code}/join`, { name, avatar: state.avatarIndex })
+      : await api("/api/rooms", { name, avatar: state.avatarIndex, settings: settingFromControls(), mode: selectedMode() });
     enterRoom(data.room, data.playerId);
   } catch (error) {
     setStatus(error.message);
@@ -474,6 +500,14 @@ els.startGameButton.addEventListener("click", async () => {
     await api(`/api/rooms/${state.room.code}/start`, { playerId: state.playerId });
   } catch (error) {
     setStatus(error.message);
+  }
+});
+
+els.forceWritingButton.addEventListener("click", async () => {
+  try {
+    await api(`/api/rooms/${state.room.code}/force-writing`, { playerId: state.playerId });
+  } catch (error) {
+    els.drawingStatus.textContent = error.message;
   }
 });
 
@@ -578,7 +612,7 @@ els.nextAlbumButton.addEventListener("click", () => {
 setInterval(() => {
   renderCountdown();
   updateClock(els.writeTimer, state.room?.settings?.writeSeconds || 1);
-  updateClock(els.drawTimer, state.room?.settings?.drawSeconds || 1);
+  updateClock(els.drawTimer, state.room?.settings?.drawSeconds || 1, state.room?.stage === "drawing");
 }, 250);
 
 if (state.roomCode) {
@@ -586,4 +620,5 @@ if (state.roomCode) {
   els.roomCodeField.classList.remove("hidden");
 }
 
+renderAvatar();
 showScreen("homeView");
