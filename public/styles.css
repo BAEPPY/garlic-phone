@@ -99,7 +99,7 @@ button { cursor: pointer; }
 .logo-mark {
   display: inline-grid;
   place-items: center;
-  width: min(470px, 82vw);
+  width: min(235px, 41vw);
 }
 .logo-mark img {
   display: block;
@@ -615,7 +615,7 @@ textarea { min-height: 240px; padding: 18px; resize: vertical; font-size: 22px; 
 @media (max-width: 620px) {
   .screen { padding: 14px; }
   .mini-veg { display: none; }
-  .logo-mark { width: min(300px, 86vw); }
+  .logo-mark { width: min(150px, 43vw); }
   .logo-mark.small { width: min(210px, 60vw); }
   .card h2, .panel h2, .custom-settings h2 { font-size: 25px; }
   .primary-action, .secondary-action { width: 100%; min-width: 0; }
