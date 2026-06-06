@@ -90,7 +90,7 @@ function makeRoom(hostName, settings) {
     nextStage: "",
     countdownEndsAt: 0,
     roundEndsAt: 0,
-    players: [{ id: hostId, name: hostName, joinedAt: Date.now(), prompt: "", promptAuthorId: "", promptAuthorName: "" }],
+    players: [{ id: hostId, name: hostName, avatar: clamp(settings?.avatar, 0, 9, 0), joinedAt: Date.now(), prompt: "", promptAuthorId: "", promptAuthorName: "" }],
     writings: [],
     drawings: [],
     events: new Set()
@@ -114,7 +114,7 @@ function publicRoom(room, clientId = "") {
     nextStage: room.nextStage,
     countdownEndsAt: room.countdownEndsAt,
     roundEndsAt: room.roundEndsAt,
-    players: room.players.map(({ id, name }) => ({ id, name })),
+    players: room.players.map(({ id, name, avatar }) => ({ id, name, avatar })),
     writingCount: room.writings.length,
     drawingCount: room.drawings.length,
     gallery: room.stage === "gallery" ? room.drawings : [],
@@ -212,7 +212,7 @@ async function handleApi(req, res) {
     if (req.method === "POST" && url.pathname === "/api/rooms") {
       const body = await readBody(req);
       const name = String(body.name || "플레이어").trim().slice(0, 18) || "플레이어";
-      const { room, playerId } = makeRoom(name, { ...body.settings, mode: body.mode });
+      const { room, playerId } = makeRoom(name, { ...body.settings, mode: body.mode, avatar: body.avatar });
       json(res, 200, { playerId, room: publicRoom(room, playerId) });
       publish(room);
       return;
@@ -226,7 +226,7 @@ async function handleApi(req, res) {
       const body = await readBody(req);
       const name = String(body.name || "플레이어").trim().slice(0, 18) || "플레이어";
       const playerId = id(12);
-      room.players.push({ id: playerId, name, joinedAt: Date.now(), prompt: "", promptAuthorId: "", promptAuthorName: "" });
+      room.players.push({ id: playerId, name, avatar: clamp(body.avatar, 0, 9, room.players.length % 10), joinedAt: Date.now(), prompt: "", promptAuthorId: "", promptAuthorName: "" });
       json(res, 200, { playerId, room: publicRoom(room, playerId) });
       publish(room);
       return;
@@ -265,6 +265,18 @@ async function handleApi(req, res) {
       const body = await readBody(req);
       if (!requireHost(room, body, res)) return;
       startDrawing(room);
+      json(res, 200, { room: publicRoom(room, body.playerId) });
+      publish(room);
+      return;
+    }
+
+    if (req.method === "POST" && url.pathname.match(/^\/api\/rooms\/[^/]+\/force-writing$/)) {
+      const room = getRoom(parts[3]);
+      if (!room) return json(res, 404, { error: "방을 찾을 수 없어요." });
+      const body = await readBody(req);
+      if (!requireHost(room, body, res)) return;
+      if (room.stage !== "drawing") return json(res, 400, { error: "그림 그리는 중에만 글쓰기로 바꿀 수 있어요." });
+      startCountdown(room, "writing");
       json(res, 200, { room: publicRoom(room, body.playerId) });
       publish(room);
       return;
