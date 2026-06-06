@@ -39,32 +39,54 @@ function readBody(req) {
   });
 }
 
-function makeRoom(drawSeconds) {
+function clamp(value, min, max, fallback) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return fallback;
+  return Math.max(min, Math.min(max, number));
+}
+
+function makeSettings(settings = {}) {
+  return {
+    maxPlayers: clamp(settings.maxPlayers, 2, 30, 14),
+    writeSeconds: clamp(settings.writeSeconds, 30, 180, 75),
+    drawSeconds: clamp(settings.drawSeconds, 30, 300, 90),
+    turns: settings.turns === "one" ? "one" : "all",
+    keepDrawing: Boolean(settings.keepDrawing),
+    scoreboard: Boolean(settings.scoreboard),
+    secrecy: settings.secrecy === "private" ? "private" : "public"
+  };
+}
+
+function makeRoom(hostName, settings) {
   const roomCode = id(6);
-  const adminId = id(12);
+  const hostId = id(12);
   const room = {
     code: roomCode,
-    adminId,
-    drawSeconds,
-    writeSeconds: 75,
+    hostId,
+    settings: makeSettings(settings),
+    mode: "normal",
     stage: "lobby",
     roundEndsAt: 0,
-    players: [],
+    players: [{ id: hostId, name: hostName, joinedAt: Date.now(), prompt: "" }],
     writings: [],
     drawings: [],
     events: new Set()
   };
   rooms.set(roomCode, room);
-  return room;
+  return { room, playerId: hostId };
+}
+
+function getRoom(code) {
+  return rooms.get(String(code || "").trim().toUpperCase());
 }
 
 function publicRoom(room, clientId = "") {
   const player = room.players.find((item) => item.id === clientId);
   return {
     code: room.code,
-    adminId: room.adminId,
-    drawSeconds: room.drawSeconds,
-    writeSeconds: room.writeSeconds,
+    hostId: room.hostId,
+    settings: room.settings,
+    mode: room.mode,
     stage: room.stage,
     roundEndsAt: room.roundEndsAt,
     players: room.players.map(({ id, name }) => ({ id, name })),
@@ -83,13 +105,9 @@ function publish(room) {
   }
 }
 
-function getRoom(code) {
-  return rooms.get(String(code || "").trim().toUpperCase());
-}
-
-function requireAdmin(room, body, res) {
-  if (body.adminId !== room.adminId) {
-    json(res, 403, { error: "관리자만 할 수 있어요." });
+function requireHost(room, body, res) {
+  if (body.playerId !== room.hostId) {
+    json(res, 403, { error: "방장만 할 수 있어요." });
     return false;
   }
   return true;
@@ -104,7 +122,7 @@ function assignPrompts(room) {
 
 function startWriting(room) {
   room.stage = "writing";
-  room.roundEndsAt = Date.now() + room.writeSeconds * 1000;
+  room.roundEndsAt = Date.now() + room.settings.writeSeconds * 1000;
   room.writings = [];
   room.drawings = [];
   room.players.forEach((player) => {
@@ -115,7 +133,7 @@ function startWriting(room) {
 function startDrawing(room) {
   assignPrompts(room);
   room.stage = "drawing";
-  room.roundEndsAt = Date.now() + room.drawSeconds * 1000;
+  room.roundEndsAt = Date.now() + room.settings.drawSeconds * 1000;
   room.drawings = [];
 }
 
@@ -126,9 +144,9 @@ async function handleApi(req, res) {
   try {
     if (req.method === "POST" && url.pathname === "/api/rooms") {
       const body = await readBody(req);
-      const drawSeconds = Math.max(30, Math.min(300, Number(body.drawSeconds || 90)));
-      const room = makeRoom(drawSeconds);
-      json(res, 200, { adminId: room.adminId, room: publicRoom(room, room.adminId) });
+      const name = String(body.name || "플레이어").trim().slice(0, 18) || "플레이어";
+      const { room, playerId } = makeRoom(name, body.settings);
+      json(res, 200, { playerId, room: publicRoom(room, playerId) });
       publish(room);
       return;
     }
@@ -136,7 +154,7 @@ async function handleApi(req, res) {
     if (req.method === "POST" && url.pathname.match(/^\/api\/rooms\/[^/]+\/join$/)) {
       const room = getRoom(parts[3]);
       if (!room) return json(res, 404, { error: "방을 찾을 수 없어요." });
-      if (room.players.length >= 30) return json(res, 403, { error: "이 방은 30명으로 가득 찼어요." });
+      if (room.players.length >= room.settings.maxPlayers) return json(res, 403, { error: "이 방은 가득 찼어요." });
       if (room.stage !== "lobby") return json(res, 403, { error: "이미 게임이 시작된 방이에요." });
       const body = await readBody(req);
       const name = String(body.name || "플레이어").trim().slice(0, 18) || "플레이어";
@@ -151,21 +169,24 @@ async function handleApi(req, res) {
       const room = getRoom(parts[3]);
       if (!room) return json(res, 404, { error: "방을 찾을 수 없어요." });
       const body = await readBody(req);
-      if (!requireAdmin(room, body, res)) return;
-      room.drawSeconds = Math.max(30, Math.min(300, Number(body.drawSeconds || room.drawSeconds)));
-      json(res, 200, { room: publicRoom(room, room.adminId) });
+      if (!requireHost(room, body, res)) return;
+      if (room.stage !== "lobby") return json(res, 400, { error: "시작 전 대기실에서만 설정할 수 있어요." });
+      const next = makeSettings({ ...room.settings, ...body.settings });
+      next.maxPlayers = Math.max(room.players.length, next.maxPlayers);
+      room.settings = next;
+      json(res, 200, { room: publicRoom(room, body.playerId) });
       publish(room);
       return;
     }
 
-    if (req.method === "POST" && url.pathname.match(/^\/api\/rooms\/[^/]+\/start-writing$/)) {
+    if (req.method === "POST" && url.pathname.match(/^\/api\/rooms\/[^/]+\/start$/)) {
       const room = getRoom(parts[3]);
       if (!room) return json(res, 404, { error: "방을 찾을 수 없어요." });
       const body = await readBody(req);
-      if (!requireAdmin(room, body, res)) return;
+      if (!requireHost(room, body, res)) return;
       if (room.players.length < 1) return json(res, 400, { error: "참가자가 들어온 뒤 시작할 수 있어요." });
       startWriting(room);
-      json(res, 200, { room: publicRoom(room, room.adminId) });
+      json(res, 200, { room: publicRoom(room, body.playerId) });
       publish(room);
       return;
     }
@@ -174,9 +195,9 @@ async function handleApi(req, res) {
       const room = getRoom(parts[3]);
       if (!room) return json(res, 404, { error: "방을 찾을 수 없어요." });
       const body = await readBody(req);
-      if (!requireAdmin(room, body, res)) return;
+      if (!requireHost(room, body, res)) return;
       startDrawing(room);
-      json(res, 200, { room: publicRoom(room, room.adminId) });
+      json(res, 200, { room: publicRoom(room, body.playerId) });
       publish(room);
       return;
     }
@@ -228,10 +249,10 @@ async function handleApi(req, res) {
       const room = getRoom(parts[3]);
       if (!room) return json(res, 404, { error: "방을 찾을 수 없어요." });
       const body = await readBody(req);
-      if (!requireAdmin(room, body, res)) return;
+      if (!requireHost(room, body, res)) return;
       room.stage = "gallery";
       room.roundEndsAt = 0;
-      json(res, 200, { room: publicRoom(room, room.adminId) });
+      json(res, 200, { room: publicRoom(room, body.playerId) });
       publish(room);
       return;
     }
