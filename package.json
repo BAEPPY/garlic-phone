@@ -1,0 +1,12 @@
+{
+  "name": "garlic-phone",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Garlic Phone, a classroom drawing-phone web app for up to 30 players.",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "node server.js"
+  }
+}

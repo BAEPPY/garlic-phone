@@ -1,0 +1,437 @@
+:root {
+  color-scheme: light;
+  font-family: Inter, Pretendard, "Segoe UI", system-ui, sans-serif;
+  background: #f5f7fb;
+  color: #182032;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+}
+
+button,
+input,
+textarea {
+  font: inherit;
+}
+
+button {
+  min-height: 44px;
+  border: 0;
+  border-radius: 8px;
+  padding: 0 18px;
+  background: #126b7a;
+  color: white;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.secondary {
+  background: #e7eef5;
+  color: #182032;
+}
+
+.app {
+  width: min(1440px, 100%);
+  margin: 0 auto;
+}
+
+.hero {
+  position: relative;
+  min-height: 230px;
+  overflow: hidden;
+  display: flex;
+  align-items: flex-end;
+  padding: 42px clamp(20px, 5vw, 72px);
+  background: #111827;
+  color: white;
+}
+
+#heroCanvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.hero::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, rgba(17, 24, 39, 0.94), rgba(17, 24, 39, 0.32));
+}
+
+.hero-copy {
+  position: relative;
+  z-index: 1;
+}
+
+.hero-copy p {
+  margin: 0 0 10px;
+  color: #b7f2d5;
+  font-weight: 900;
+}
+
+h1 {
+  margin: 0;
+  font-size: clamp(52px, 8vw, 96px);
+  line-height: 0.95;
+  letter-spacing: 0;
+}
+
+.view {
+  display: none;
+  padding: 18px;
+}
+
+.view.active {
+  display: grid;
+}
+
+.admin-view {
+  grid-template-columns: 340px minmax(0, 1fr);
+  gap: 18px;
+}
+
+.control-panel,
+.main-panel,
+.join-panel,
+.play-view,
+.draw-view {
+  background: white;
+  border: 1px solid #d9e2ec;
+  border-radius: 8px;
+}
+
+.control-panel,
+.main-panel,
+.join-panel,
+.play-view,
+.draw-view {
+  padding: 18px;
+}
+
+.control-panel {
+  display: grid;
+  align-content: start;
+  gap: 18px;
+}
+
+.room-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.room-heading span,
+.stage-header p,
+.section-title {
+  margin: 0;
+  color: #64748b;
+  font-weight: 900;
+}
+
+.room-heading strong {
+  font-size: 28px;
+}
+
+.field {
+  display: grid;
+  gap: 8px;
+  color: #334155;
+  font-weight: 800;
+}
+
+.range-row {
+  display: grid;
+  grid-template-columns: 1fr 56px;
+  gap: 10px;
+  align-items: center;
+}
+
+input,
+textarea {
+  width: 100%;
+  border: 1px solid #cbd6e2;
+  border-radius: 8px;
+  background: #f9fbfd;
+  color: #111827;
+}
+
+input {
+  min-height: 44px;
+  padding: 0 12px;
+}
+
+input[type="range"] {
+  padding: 0;
+  accent-color: #126b7a;
+}
+
+input[type="color"] {
+  width: 46px;
+  height: 44px;
+  padding: 4px;
+  background: white;
+}
+
+textarea {
+  min-height: 190px;
+  padding: 16px;
+  resize: vertical;
+  line-height: 1.45;
+  font-size: 20px;
+}
+
+output {
+  font-weight: 900;
+  color: #126b7a;
+  text-align: right;
+}
+
+.button-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+}
+
+.invite-box {
+  display: grid;
+  gap: 10px;
+  padding-top: 4px;
+}
+
+#qrImage,
+#qrCanvas {
+  width: 220px;
+  height: 220px;
+  border: 1px solid #cbd6e2;
+  border-radius: 8px;
+  background: white;
+}
+
+#qrImage {
+  object-fit: contain;
+}
+
+.qr-fallback {
+  display: none;
+}
+
+.qr-fallback.active {
+  display: block;
+}
+
+.stage-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.stage-header h2 {
+  margin: 4px 0 0;
+  font-size: 25px;
+  line-height: 1.28;
+}
+
+.timer,
+.pill {
+  min-width: 104px;
+  border-radius: 8px;
+  border: 1px solid #cbd6e2;
+  padding: 11px 14px;
+  text-align: center;
+  font-size: 24px;
+  font-weight: 950;
+  color: #126b7a;
+  background: #f9fbfd;
+}
+
+.progress-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.progress-grid div {
+  border: 1px solid #e0e8f0;
+  border-radius: 8px;
+  padding: 14px;
+  background: #fbfdff;
+}
+
+.progress-grid span {
+  display: block;
+  color: #64748b;
+  font-weight: 800;
+}
+
+.progress-grid strong {
+  display: block;
+  margin-top: 6px;
+  font-size: 28px;
+}
+
+.player-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 10px;
+}
+
+.player-list.wide {
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+}
+
+.player {
+  min-height: 44px;
+  border: 1px solid #e1e8ef;
+  border-radius: 8px;
+  padding: 10px 12px;
+  background: #fbfdff;
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.join-view {
+  place-items: center;
+}
+
+.join-panel {
+  width: min(460px, 100%);
+  display: grid;
+  gap: 16px;
+}
+
+.play-view,
+.draw-view {
+  gap: 16px;
+}
+
+.writing-page {
+  display: grid;
+  gap: 12px;
+}
+
+.canvas-shell {
+  width: 100%;
+  aspect-ratio: 14 / 9;
+  border: 1px solid #cbd6e2;
+  border-radius: 8px;
+  overflow: hidden;
+  background: white;
+}
+
+#drawCanvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  touch-action: none;
+}
+
+.tool-strip {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.segmented {
+  display: inline-flex;
+  border: 1px solid #cbd6e2;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.segmented .tool {
+  width: 46px;
+  min-height: 44px;
+  border-radius: 0;
+  background: white;
+  color: #182032;
+  padding: 0;
+}
+
+.segmented .tool.active {
+  background: #126b7a;
+  color: white;
+}
+
+#sizeInput {
+  width: 160px;
+}
+
+.gallery {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 12px;
+}
+
+.gallery-card {
+  border: 1px solid #dbe4ed;
+  border-radius: 8px;
+  overflow: hidden;
+  background: white;
+}
+
+.gallery-card img {
+  width: 100%;
+  aspect-ratio: 14 / 9;
+  object-fit: contain;
+  display: block;
+  background: white;
+}
+
+.gallery-card div {
+  padding: 11px 12px;
+}
+
+.gallery-card strong,
+.gallery-card span {
+  display: block;
+}
+
+.gallery-card span {
+  margin-top: 4px;
+  color: #64748b;
+}
+
+.status {
+  min-height: 24px;
+  margin: 0;
+  color: #475569;
+  font-weight: 700;
+}
+
+@media (max-width: 860px) {
+  .admin-view {
+    grid-template-columns: 1fr;
+  }
+
+  .stage-header {
+    flex-direction: column;
+  }
+
+  .timer,
+  .pill {
+    width: 100%;
+  }
+
+  .progress-grid {
+    grid-template-columns: 1fr;
+  }
+}
