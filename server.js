@@ -438,7 +438,7 @@ async function handleApi(req, res) {
       const player = room.players.find((item) => item.id === body.playerId);
       if (!player) return json(res, 403, { error: "참가자 정보가 맞지 않아요." });
       const drawing = String(body.drawing || "");
-      if (!drawing.startsWith("data:image/png;base64,")) return json(res, 400, { error: "그림 데이터가 필요해요." });
+      if (!/^data:image\/(png|webp|jpeg);base64,/.test(drawing)) return json(res, 400, { error: "그림 데이터가 필요해요." });
       addDrawingEntry(room, player, drawing);
       if (currentEntries(room).length >= room.players.length) advanceTurn(room);
       json(res, 200, { room: publicRoom(room, player.id) });
