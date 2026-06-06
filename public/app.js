@@ -8,14 +8,16 @@ const state = {
   tool: "pencil",
   drawing: false,
   strokes: [],
-  currentStroke: null
+  currentStroke: null,
+  selectedAlbumIndex: 0,
+  albumAutoTimer: null
 };
 
 const $ = (selector) => document.querySelector(selector);
 const els = {
   screens: [...document.querySelectorAll(".screen")],
-  homeView: $("#homeView"),
-  lobbyView: $("#lobbyView"),
+  countdownOverlay: $("#countdownOverlay"),
+  countdownNumber: $("#countdownNumber"),
   playerName: $("#playerName"),
   joinCode: $("#joinCode"),
   roomCodeField: $("#roomCodeField"),
@@ -26,11 +28,17 @@ const els = {
   playerCount: $("#playerCount"),
   maxPlayersSelect: $("#maxPlayersSelect"),
   playerList: $("#playerList"),
+  presetTab: $("#presetTab"),
+  customTab: $("#customTab"),
+  presetPane: $("#presetPane"),
+  customPane: $("#customPane"),
+  customLockNote: $("#customLockNote"),
+  modeButtons: [...document.querySelectorAll(".mode-card")],
   timePresetSelect: $("#timePresetSelect"),
   turnsSelect: $("#turnsSelect"),
   keepDrawingSelect: $("#keepDrawingSelect"),
-  scoreboardToggle: $("#scoreboardToggle"),
   secrecySelect: $("#secrecySelect"),
+  soundToggle: $("#soundToggle"),
   copyInviteButton: $("#copyInviteButton"),
   qrButton: $("#qrButton"),
   startGameButton: $("#startGameButton"),
@@ -53,7 +61,19 @@ const els = {
   clearButton: $("#clearButton"),
   submitDrawingButton: $("#submitDrawingButton"),
   drawingStatus: $("#drawingStatus"),
-  gallery: $("#gallery")
+  galleryHomeButton: $("#galleryHomeButton"),
+  albumList: $("#albumList"),
+  albumSettings: $("#albumSettings"),
+  albumViewer: $("#albumViewer"),
+  displayAutoToggle: $("#displayAutoToggle"),
+  albumSpeedSelect: $("#albumSpeedSelect"),
+  albumReverseToggle: $("#albumReverseToggle"),
+  startAlbumButton: $("#startAlbumButton"),
+  albumTitle: $("#albumTitle"),
+  albumPrompt: $("#albumPrompt"),
+  albumDrawing: $("#albumDrawing"),
+  prevAlbumButton: $("#prevAlbumButton"),
+  nextAlbumButton: $("#nextAlbumButton")
 };
 
 const ctx = els.drawCanvas.getContext("2d");
@@ -61,39 +81,44 @@ ctx.lineCap = "round";
 ctx.lineJoin = "round";
 paintBackground("#ffffff");
 
-const names = ["마늘선생님", "칠판요정", "분필장인", "급식히어로", "교실탐험가", "숙제박사"];
+const names = ["마늘선생님", "쪽파요정", "고추대장", "당근탐험가", "브로콜리박사", "가지화가", "토마토친구"];
+const playerIcons = ["🧄", "🧅", "🌶", "🥕", "🥦", "🍆", "🍅"];
 
 function showScreen(id) {
   els.screens.forEach((screen) => screen.classList.toggle("active", screen.id === id));
 }
 
+function showSettingsPane(name) {
+  const showPreset = name === "preset";
+  els.presetTab.classList.toggle("active", showPreset);
+  els.customTab.classList.toggle("active", !showPreset);
+  els.presetPane.classList.toggle("active", showPreset);
+  els.customPane.classList.toggle("active", !showPreset);
+}
+
+function selectedMode() {
+  return els.modeButtons.find((button) => button.classList.contains("selected"))?.dataset.mode || "normal";
+}
+
 function settingFromControls() {
-  const time = els.timePresetSelect.value;
-  const timeMap = {
-    quick: { writeSeconds: 45, drawSeconds: 60 },
-    normal: { writeSeconds: 75, drawSeconds: 90 },
-    slow: { writeSeconds: 120, drawSeconds: 150 }
-  };
   return {
     maxPlayers: Number(els.maxPlayersSelect.value),
-    ...timeMap[time],
+    timeMode: els.timePresetSelect.value,
     turns: els.turnsSelect.value,
     keepDrawing: els.keepDrawingSelect.value === "enabled",
-    scoreboard: els.scoreboardToggle.checked,
-    secrecy: els.secrecySelect.value
+    secrecy: els.secrecySelect.value,
+    sound: els.soundToggle.checked
   };
 }
 
 function controlsFromSettings(settings) {
   if (!settings) return;
   els.maxPlayersSelect.value = String(settings.maxPlayers);
-  if (settings.writeSeconds <= 45) els.timePresetSelect.value = "quick";
-  else if (settings.writeSeconds >= 120) els.timePresetSelect.value = "slow";
-  else els.timePresetSelect.value = "normal";
-  els.turnsSelect.value = settings.turns;
+  els.timePresetSelect.value = settings.timeMode || "normal";
+  els.turnsSelect.value = settings.turns || "all";
   els.keepDrawingSelect.value = settings.keepDrawing ? "enabled" : "disabled";
-  els.scoreboardToggle.checked = Boolean(settings.scoreboard);
-  els.secrecySelect.value = settings.secrecy;
+  els.secrecySelect.value = settings.secrecy || "public";
+  els.soundToggle.checked = settings.sound !== false;
 }
 
 async function api(path, body) {
@@ -131,6 +156,7 @@ function enterRoom(room, playerId) {
 }
 
 function render() {
+  renderCountdown();
   if (!state.room || !state.playerId) {
     showScreen("homeView");
     els.roomCodeField.classList.toggle("hidden", !state.roomCode);
@@ -138,10 +164,18 @@ function render() {
     return;
   }
 
-  if (state.room.stage === "lobby") renderLobby();
+  if (state.room.stage === "lobby" || state.room.stage === "countdown") renderLobby();
   if (state.room.stage === "writing") renderWriting();
   if (state.room.stage === "drawing") renderDrawing();
   if (state.room.stage === "gallery") renderGalleryScreen();
+}
+
+function renderCountdown() {
+  const active = state.room?.stage === "countdown";
+  els.countdownOverlay.hidden = !active;
+  if (!active) return;
+  const remaining = Math.max(1, Math.ceil((state.room.countdownEndsAt - Date.now()) / 1000));
+  els.countdownNumber.textContent = String(Math.min(3, remaining));
 }
 
 function renderLobby() {
@@ -149,10 +183,11 @@ function renderLobby() {
   const room = state.room;
   const isHost = room.hostId === state.playerId;
   controlsFromSettings(room.settings);
+  els.modeButtons.forEach((button) => button.classList.toggle("selected", button.dataset.mode === room.mode));
   els.playerCount.textContent = `${room.players.length}/${room.settings.maxPlayers}`;
   renderPlayers(room.players, room.settings.maxPlayers, room.hostId);
-  setControlsDisabled(!isHost);
-  els.startGameButton.disabled = !isHost || room.players.length < 1;
+  setControlsDisabled(!isHost || room.stage === "countdown");
+  els.startGameButton.disabled = !isHost || room.players.length < 1 || room.stage === "countdown";
   els.inviteLink.value = inviteUrl(room.code);
   setQr(inviteUrl(room.code));
 }
@@ -171,39 +206,81 @@ function renderWriting() {
 
 function renderDrawing() {
   showScreen("drawView");
-  els.drawingPrompt.textContent = state.room.assignedPrompt || "상상 속 장면";
+  els.drawingPrompt.textContent = state.room.assignedPrompt || "상상 한 장면";
   els.submitDrawingButton.disabled = Boolean(state.room.myDrawing);
   els.drawingStatus.textContent = state.room.myDrawing ? "제출했어요. 결과를 기다리는 중이에요." : "";
 }
 
 function renderGalleryScreen() {
   showScreen("galleryView");
-  els.gallery.innerHTML = "";
-  state.room.gallery.forEach((item) => {
-    const card = document.createElement("article");
-    card.className = "gallery-card";
-    card.innerHTML = `
-      <img src="${item.drawing}" alt="${escapeHtml(item.name)}의 그림" />
-      <div>
-        <strong>${escapeHtml(item.name)}</strong>
-        <span>${escapeHtml(item.prompt || "")}</span>
-      </div>
-    `;
-    els.gallery.append(card);
+  renderAlbumList();
+  renderSelectedAlbum();
+}
+
+function renderAlbumList() {
+  const albums = orderedAlbums();
+  if (state.selectedAlbumIndex >= albums.length) state.selectedAlbumIndex = 0;
+  els.albumList.innerHTML = "";
+  albums.forEach((album, index) => {
+    const button = document.createElement("button");
+    button.className = `player-row album-row${index === state.selectedAlbumIndex ? " selected" : ""}`;
+    button.type = "button";
+    button.innerHTML = `<span class="player-icon">${playerIcons[index % playerIcons.length]}</span><span>${escapeHtml(album.authorName)}의 앨범</span><span>${album.drawings.length}</span>`;
+    button.addEventListener("click", () => {
+      state.selectedAlbumIndex = index;
+      showAlbumViewer();
+      renderSelectedAlbum();
+      restartAlbumAuto();
+    });
+    els.albumList.append(button);
   });
 }
 
+function showAlbumViewer() {
+  els.albumSettings.hidden = true;
+  els.albumViewer.hidden = false;
+}
+
+function renderSelectedAlbum() {
+  const albums = orderedAlbums();
+  const album = albums[state.selectedAlbumIndex];
+  if (!album) return;
+  const drawing = album.drawings[0] || {};
+  els.albumTitle.textContent = `${album.authorName}의 앨범`;
+  els.albumPrompt.textContent = album.prompt || "제시어가 없어요.";
+  els.albumDrawing.src = drawing.drawing || "";
+  renderAlbumList();
+}
+
+function orderedAlbums() {
+  const albums = [...(state.room?.albums || [])];
+  return els.albumReverseToggle.checked ? albums.reverse() : albums;
+}
+
+function moveAlbum(step) {
+  const albums = orderedAlbums();
+  if (!albums.length) return;
+  state.selectedAlbumIndex = (state.selectedAlbumIndex + step + albums.length) % albums.length;
+  renderSelectedAlbum();
+}
+
+function restartAlbumAuto() {
+  window.clearInterval(state.albumAutoTimer);
+  if (!els.displayAutoToggle.checked || els.albumViewer.hidden) return;
+  state.albumAutoTimer = window.setInterval(() => moveAlbum(1), Number(els.albumSpeedSelect.value));
+}
+
 function setControlsDisabled(disabled) {
-  [
-    els.maxPlayersSelect,
-    els.timePresetSelect,
-    els.turnsSelect,
-    els.keepDrawingSelect,
-    els.scoreboardToggle,
-    els.secrecySelect
-  ].forEach((control) => {
-    control.disabled = disabled;
+  const customLocked = state.room?.mode !== "custom";
+  els.modeButtons.forEach((button) => {
+    button.disabled = disabled;
   });
+  [els.timePresetSelect, els.turnsSelect, els.keepDrawingSelect, els.secrecySelect].forEach((control) => {
+    control.disabled = disabled || customLocked;
+  });
+  els.maxPlayersSelect.disabled = disabled;
+  els.soundToggle.disabled = disabled;
+  els.customLockNote.hidden = !customLocked;
 }
 
 function renderPlayers(players, maxPlayers, hostId) {
@@ -212,9 +289,10 @@ function renderPlayers(players, maxPlayers, hostId) {
     const player = players[i];
     const row = document.createElement("div");
     row.className = `player-row${player ? "" : " empty"}`;
+    const icon = playerIcons[i % playerIcons.length];
     row.innerHTML = player
-      ? `<span class="player-icon">🧄</span><span>${escapeHtml(player.name)}</span><span>${player.id === hostId ? "👑" : ""}</span>`
-      : `<span class="player-icon">☺</span><span>EMPTY</span><span></span>`;
+      ? `<span class="player-icon">${icon}</span><span>${escapeHtml(player.name)}</span><span>${player.id === hostId ? "방장" : ""}</span>`
+      : `<span class="player-icon">+</span><span>EMPTY</span><span></span>`;
     els.playerList.append(row);
   }
 }
@@ -240,7 +318,7 @@ function drawQrFallback(text) {
   qr.fillStyle = "#32156b";
   qr.font = "800 15px sans-serif";
   qr.textAlign = "center";
-  qr.fillText("QR을 불러오지 못하면", 110, 102);
+  qr.fillText("QR이 안 보이면", 110, 102);
   qr.fillText("링크를 복사해 주세요", 110, 126);
   if (!text) return;
   let seed = 0;
@@ -298,17 +376,37 @@ function canDraw() {
   return state.room?.stage === "drawing" && !state.room.myDrawing;
 }
 
-async function saveSettings() {
+async function saveSettings(extra = {}) {
   if (!state.room || state.room.hostId !== state.playerId) return;
   try {
     await api(`/api/rooms/${state.room.code}/settings`, {
       playerId: state.playerId,
-      settings: settingFromControls()
+      settings: settingFromControls(),
+      ...extra
     });
   } catch (error) {
     setStatus(error.message);
   }
 }
+
+function updateClock(element, totalSeconds) {
+  const remaining = state.room?.roundEndsAt ? Math.max(0, Math.ceil((state.room.roundEndsAt - Date.now()) / 1000)) : null;
+  const text = remaining === null ? "--:--" : `${String(Math.floor(remaining / 60)).padStart(2, "0")}:${String(remaining % 60).padStart(2, "0")}`;
+  const progress = remaining === null ? 0 : 1 - remaining / Math.max(1, totalSeconds);
+  element.querySelector("span").textContent = text;
+  element.style.setProperty("--progress", `${Math.min(1, Math.max(0, progress)) * 360}deg`);
+}
+
+els.presetTab.addEventListener("click", () => showSettingsPane("preset"));
+els.customTab.addEventListener("click", () => showSettingsPane("custom"));
+
+els.modeButtons.forEach((button) => {
+  button.addEventListener("click", () => {
+    els.modeButtons.forEach((item) => item.classList.toggle("selected", item === button));
+    if (button.dataset.mode === "custom") showSettingsPane("custom");
+    saveSettings({ mode: selectedMode() });
+  });
+});
 
 els.randomNameButton.addEventListener("click", () => {
   els.playerName.value = names[Math.floor(Math.random() * names.length)];
@@ -324,7 +422,7 @@ els.enterButton.addEventListener("click", async () => {
     const code = (els.joinCode.value || state.roomCode).trim().toUpperCase();
     const data = code
       ? await api(`/api/rooms/${code}/join`, { name })
-      : await api("/api/rooms", { name, settings: settingFromControls() });
+      : await api("/api/rooms", { name, settings: settingFromControls(), mode: selectedMode() });
     enterRoom(data.room, data.playerId);
   } catch (error) {
     setStatus(error.message);
@@ -336,15 +434,13 @@ els.leaveLobbyButton.addEventListener("click", () => {
   location.href = "/";
 });
 
-[
-  els.maxPlayersSelect,
-  els.timePresetSelect,
-  els.turnsSelect,
-  els.keepDrawingSelect,
-  els.scoreboardToggle,
-  els.secrecySelect
-].forEach((control) => {
-  control.addEventListener("change", saveSettings);
+els.galleryHomeButton.addEventListener("click", () => {
+  localStorage.removeItem("garlicPhonePlayerId");
+  location.href = "/";
+});
+
+[els.maxPlayersSelect, els.timePresetSelect, els.turnsSelect, els.keepDrawingSelect, els.secrecySelect, els.soundToggle].forEach((control) => {
+  control.addEventListener("change", () => saveSettings());
 });
 
 els.copyInviteButton.addEventListener("click", async () => {
@@ -455,11 +551,34 @@ els.submitDrawingButton.addEventListener("click", async () => {
   }
 });
 
+els.startAlbumButton.addEventListener("click", () => {
+  showAlbumViewer();
+  state.selectedAlbumIndex = 0;
+  renderSelectedAlbum();
+  restartAlbumAuto();
+});
+
+els.prevAlbumButton.addEventListener("click", () => {
+  moveAlbum(-1);
+  restartAlbumAuto();
+});
+
+els.nextAlbumButton.addEventListener("click", () => {
+  moveAlbum(1);
+  restartAlbumAuto();
+});
+
+[els.displayAutoToggle, els.albumSpeedSelect, els.albumReverseToggle].forEach((control) => {
+  control.addEventListener("change", () => {
+    renderSelectedAlbum();
+    restartAlbumAuto();
+  });
+});
+
 setInterval(() => {
-  const remaining = state.room?.roundEndsAt ? Math.max(0, Math.ceil((state.room.roundEndsAt - Date.now()) / 1000)) : null;
-  const text = remaining === null ? "--:--" : `${String(Math.floor(remaining / 60)).padStart(2, "0")}:${String(remaining % 60).padStart(2, "0")}`;
-  els.writeTimer.textContent = text;
-  els.drawTimer.textContent = text;
+  renderCountdown();
+  updateClock(els.writeTimer, state.room?.settings?.writeSeconds || 1);
+  updateClock(els.drawTimer, state.room?.settings?.drawSeconds || 1);
 }, 250);
 
 if (state.roomCode) {

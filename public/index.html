@@ -8,14 +8,18 @@
   </head>
   <body>
     <main class="app">
+      <div id="countdownOverlay" class="countdown-overlay" hidden>
+        <div class="countdown-card"><span id="countdownNumber">3</span></div>
+      </div>
+
       <section id="homeView" class="screen home-screen active">
         <header class="top-bar">
           <button class="small-button" type="button">KO</button>
-          <div class="mini-veg" aria-hidden="true"><span>🧄</span><span>🌶</span><span>🥬</span></div>
+          <div class="mini-veg" aria-hidden="true"><span>마</span><span>고</span><span>파</span><span>당</span><span>브</span></div>
         </header>
 
         <section class="brand">
-          <div class="logo-mark"><span>🧄</span><strong>갈릭폰</strong></div>
+          <div class="logo-mark"><span>마</span><strong>갈릭폰</strong></div>
           <p>그림으로 이어지는 마늘맛 전화 게임</p>
         </section>
 
@@ -25,11 +29,13 @@
             <div class="join-body">
               <div class="veggie-badge" aria-hidden="true">
                 <div class="veggie-scene">
-                  <b class="veg garlic">🧄</b>
-                  <b class="veg pepper">🌶</b>
-                  <b class="veg scallion">🥬</b>
+                  <b class="veg garlic"></b>
+                  <b class="veg onion"></b>
+                  <b class="veg pepper"></b>
+                  <b class="veg carrot"></b>
+                  <b class="veg broccoli"></b>
                 </div>
-                <button id="randomNameButton" type="button" title="닉네임 바꾸기">↻</button>
+                <button id="randomNameButton" type="button" title="채소 캐릭터와 닉네임 바꾸기">↻</button>
               </div>
 
               <div class="join-form">
@@ -59,14 +65,17 @@
       <section id="lobbyView" class="screen lobby-screen">
         <header class="game-header">
           <button id="leaveLobbyButton" class="small-button" type="button">◀ 나가기</button>
-          <div class="logo-mark small"><span>🧄</span><strong>갈릭폰</strong></div>
-          <button class="small-button" type="button">소리</button>
+          <div class="logo-mark small"><span>마</span><strong>갈릭폰</strong></div>
+          <label class="sound-switch" title="소리 켜기 또는 끄기">
+            <input id="soundToggle" type="checkbox" checked />
+            <span>소리 OFF</span><span>소리 ON</span>
+          </label>
         </header>
 
         <section class="lobby-layout">
           <aside class="panel players-panel">
             <h2>참가자 <span id="playerCount">0/14</span></h2>
-            <select id="maxPlayersSelect" aria-label="최대 참가자 수">
+            <select id="maxPlayersSelect" aria-label="최대 참가자">
               <option value="6">6명</option><option value="8">8명</option><option value="10">10명</option>
               <option value="14" selected>14명</option><option value="20">20명</option><option value="30">30명</option>
             </select>
@@ -74,26 +83,33 @@
           </aside>
 
           <section class="panel settings-panel">
-            <div class="tabs"><button class="tab" type="button">프리셋</button><button class="tab active" type="button">전체 설정</button></div>
-            <div class="settings-content">
-              <div class="preset-grid">
-                <button class="preset-card selected" type="button"><span>🧄</span><strong>일반</strong></button>
-                <button class="preset-card locked" type="button" disabled><span>🌶</span><strong>추후 추가</strong></button>
-                <button class="preset-card locked" type="button" disabled><span>🥬</span><strong>추후 추가</strong></button>
-              </div>
-              <div class="custom-settings">
-                <h2>전체 설정</h2>
-                <label class="setting-row"><span><strong>시간</strong><small>글쓰기와 그리기 제한 시간을 정해요.</small></span><select id="timePresetSelect"><option value="quick">빠르게</option><option value="normal" selected>보통</option><option value="slow">느긋하게</option></select></label>
-                <label class="setting-row"><span><strong>작업 흐름</strong><small>일반 모드는 글쓰기 다음 그리기로 진행돼요.</small></span><select id="taskFlowSelect" disabled><option>글쓰기, 그리기</option></select></label>
-                <label class="setting-row"><span><strong>턴</strong><small>모든 참가자가 한 번씩 참여해요.</small></span><select id="turnsSelect"><option value="all" selected>전체</option><option value="one">한 번</option></select></label>
-                <label class="setting-row"><span><strong>이어 그리기</strong><small>이 버전에서는 새 캔버스에서 그려요.</small></span><select id="keepDrawingSelect"><option value="disabled" selected>꺼짐</option><option value="enabled">켜짐</option></select></label>
-                <label class="setting-row"><span><strong>점수판</strong><small>결과 화면에서 점수 기능을 표시할지 정해요.</small></span><span class="toggle"><input id="scoreboardToggle" type="checkbox" /><span>OFF</span><span>ON</span></span></label>
-                <label class="setting-row"><span><strong>공개 범위</strong><small>초대 링크를 가진 사람만 들어올 수 있어요.</small></span><select id="secrecySelect"><option value="public" selected>링크 공개</option><option value="private">비공개</option></select></label>
-              </div>
+            <div class="tabs">
+              <button id="presetTab" class="tab active" type="button">프리셋</button>
+              <button id="customTab" class="tab" type="button">전체 설정</button>
             </div>
+
+            <div id="presetPane" class="settings-view preset-pane active">
+              <button class="preset-card mode-card selected" data-mode="normal" type="button"><span>📝</span><strong>일반</strong><small>글쓰기와 그림 그리기</small></button>
+              <button class="preset-card mode-card" data-mode="knockoff" type="button"><span>🧄</span><strong>녹아웃</strong><small>빠르게 이어지는 도전</small></button>
+              <button class="preset-card mode-card" data-mode="animation" type="button"><span>🎞</span><strong>애니메이션</strong><small>장면을 이어서 만들기</small></button>
+              <button class="preset-card mode-card custom" data-mode="custom" type="button"><span>⚙</span><strong>커스텀</strong><small>직접 설정하기</small></button>
+              <button class="preset-card locked" type="button" disabled><span>🧊</span><strong>아이스브레이커</strong><small>준비 중</small></button>
+              <button class="preset-card locked" type="button" disabled><span>🎨</span><strong>명작</strong><small>준비 중</small></button>
+            </div>
+
+            <div id="customPane" class="settings-view custom-pane">
+              <h2>전체 설정</h2>
+              <p id="customLockNote" class="locked-note">세부 설정은 프리셋에서 커스텀을 선택했을 때만 바꿀 수 있어요.</p>
+              <label class="setting-row"><span><strong>시간</strong><small>글쓰기와 그림 그리기의 속도를 정해요.</small></span><select id="timePresetSelect"><option value="fast">FAST</option><option value="normal" selected>NORMAL</option><option value="slow">SLOW</option><option value="regressive">REGRESSIVE</option><option value="progressive">PROGRESSIVE</option><option value="dynamic">DYNAMIC</option><option value="infinite">INFINITE</option><option value="host">HOST'S DECISION</option><option value="fasterFirst">FASTER FIRST TURN</option><option value="slowerFirst">SLOWER FIRST TURN</option></select></label>
+              <label class="setting-row"><span><strong>작업 흐름</strong><small>갈릭폰은 일반 흐름으로 진행돼요.</small></span><select id="taskFlowSelect" disabled><option>글쓰기, 그림 그리기</option></select></label>
+              <label class="setting-row"><span><strong>턴</strong><small>몇 번 이어서 진행할지 정해요.</small></span><select id="turnsSelect"><option value="few">FEW</option><option value="most">MOST</option><option value="all" selected>ALL</option><option value="allPlusOne">ALL +1</option><option value="double">200%</option><option value="triple">300%</option><option value="single">SINGLE TURN</option><option value="2">2 TURNS</option><option value="3">3 TURNS</option><option value="4">4 TURNS</option><option value="5">5 TURNS</option><option value="6">6 TURNS</option><option value="7">7 TURNS</option><option value="8">8 TURNS</option></select></label>
+              <label class="setting-row"><span><strong>이어 그리기</strong><small>이전 그림 위에 계속 그릴지 정해요.</small></span><select id="keepDrawingSelect"><option value="disabled" selected>DISABLED</option><option value="enabled">ENABLED</option></select></label>
+              <label class="setting-row"><span><strong>공개 범위</strong><small>초대 링크를 가진 사람만 들어올 수 있어요.</small></span><select id="secrecySelect"><option value="public" selected>LINK ONLY</option><option value="private">PRIVATE</option></select></label>
+            </div>
+
             <div class="lobby-actions">
               <button id="copyInviteButton" class="secondary-action" type="button">🔗 초대</button>
-              <button id="qrButton" class="square-action" type="button">▦</button>
+              <button id="qrButton" class="square-action" type="button">QR</button>
               <button id="startGameButton" class="primary-action" type="button">▶ 시작</button>
             </div>
           </section>
@@ -111,20 +127,49 @@
       </section>
 
       <section id="writeView" class="screen play-screen">
-        <header class="stage-header"><div><p>글쓰기</p><h2>다음 사람이 그릴 수 있는 문장을 써 주세요.</h2></div><div id="writeTimer" class="timer">--:--</div></header>
-        <div class="writing-page"><textarea id="writingInput" maxlength="100" placeholder="예: 비 오는 날 횡단보도에서 춤추는 우주비행사"></textarea><button id="submitWritingButton" class="primary-action" type="button">글 제출</button><p id="writingStatus" class="status">100자 안으로 입력할 수 있어요.</p></div>
+        <header class="stage-header"><div><p>글쓰기</p><h2>다음 사람이 그릴 수 있는 문장을 써 주세요.</h2></div><div id="writeTimer" class="clock-timer"><span>--:--</span><i></i></div></header>
+        <div class="writing-page"><textarea id="writingInput" maxlength="100" placeholder="예: 비 오는 운동장에서 춤추는 고추"></textarea><button id="submitWritingButton" class="primary-action" type="button">글 제출</button><p id="writingStatus" class="status">100자 안으로 입력할 수 있어요.</p></div>
       </section>
 
       <section id="drawView" class="screen draw-screen">
-        <header class="stage-header"><div><p>그리기</p><h2 id="drawingPrompt">제시어를 기다리는 중이에요.</h2></div><div id="drawTimer" class="timer">--:--</div></header>
+        <header class="stage-header"><div><p>그리기</p><h2 id="drawingPrompt">제시어를 기다리는 중이에요.</h2></div><div id="drawTimer" class="clock-timer"><span>--:--</span><i></i></div></header>
         <div class="canvas-shell"><canvas id="drawCanvas" width="1120" height="720"></canvas></div>
         <div class="tool-strip"><div class="segmented" role="group" aria-label="그리기 도구"><button class="tool active" data-tool="pencil" title="연필" type="button">✎</button><button class="tool" data-tool="bucket" title="페인트 통" type="button">▣</button><button class="tool" data-tool="eraser" title="지우개" type="button">⌫</button></div><input id="colorInput" type="color" value="#4a2a14" title="색상" aria-label="색상" /><input id="sizeInput" type="range" min="2" max="40" value="8" title="크기" aria-label="크기" /><button id="undoButton" class="secondary-action" title="되돌리기" type="button">↶</button><button id="clearButton" class="secondary-action" title="전체 지우기" type="button">전체 지우기</button><button id="submitDrawingButton" class="primary-action" type="button">그림 제출</button></div>
         <p id="drawingStatus" class="status"></p>
       </section>
 
-      <section id="galleryView" class="screen play-screen">
-        <header class="stage-header"><div><p>결과</p><h2>문장이 그림으로 바뀐 결과예요.</h2></div></header>
-        <div id="gallery" class="gallery"></div>
+      <section id="galleryView" class="screen album-screen">
+        <header class="game-header">
+          <button id="galleryHomeButton" class="small-button" type="button">⌂ 홈</button>
+          <div class="logo-mark small"><span>마</span><strong>갈릭폰</strong></div>
+          <button id="albumFullscreenButton" class="small-button" type="button">↗</button>
+        </header>
+        <section class="album-layout">
+          <aside class="panel players-panel">
+            <h2>앨범</h2>
+            <div id="albumList" class="player-list"></div>
+          </aside>
+          <section class="panel album-panel">
+            <div id="albumSettings" class="album-settings">
+              <h2>앨범 설정</h2>
+              <label class="setting-row"><span><strong>보기 방식</strong><small>자동으로 넘기거나 직접 선택해요.</small></span><span class="toggle"><input id="displayAutoToggle" type="checkbox" checked /><span>수동</span><span>자동</span></span></label>
+              <label class="setting-row"><span><strong>재생 속도</strong><small>제시어와 그림이 넘어가는 속도예요.</small></span><select id="albumSpeedSelect"><option value="4500">느리게</option><option value="2800" selected>보통</option><option value="1600">빠르게</option></select></label>
+              <label class="setting-row"><span><strong>앨범 순서</strong><small>처음부터 볼지 마지막부터 볼지 정해요.</small></span><span class="toggle"><input id="albumReverseToggle" type="checkbox" /><span>처음</span><span>끝</span></span></label>
+              <button id="startAlbumButton" class="primary-action" type="button">▶ 앨범 보기</button>
+            </div>
+            <div id="albumViewer" class="album-viewer" hidden>
+              <h2 id="albumTitle">앨범</h2>
+              <article class="album-page">
+                <p id="albumPrompt" class="album-prompt"></p>
+                <img id="albumDrawing" alt="앨범 그림" />
+              </article>
+              <div class="album-controls">
+                <button id="prevAlbumButton" class="secondary-action" type="button">◀ 이전</button>
+                <button id="nextAlbumButton" class="secondary-action" type="button">다음 ▶</button>
+              </div>
+            </div>
+          </section>
+        </section>
       </section>
     </main>
     <script src="/app.js"></script>
