@@ -131,6 +131,7 @@ function makeAlbums(room) {
     albumMap.set(writing.playerId, {
       authorId: writing.playerId,
       authorName: writing.name,
+      authorAvatar: writing.avatar,
       prompt: writing.text,
       drawings: []
     });
@@ -141,6 +142,7 @@ function makeAlbums(room) {
       albumMap.set(authorId, {
         authorId,
         authorName: drawing.promptAuthorName || drawing.name,
+        authorAvatar: drawing.promptAuthorAvatar ?? drawing.avatar,
         prompt: drawing.prompt || "",
         drawings: []
       });
@@ -202,6 +204,22 @@ function startDrawing(room) {
   room.countdownEndsAt = 0;
   room.roundEndsAt = Date.now() + room.settings.drawSeconds * 1000;
   room.drawings = [];
+}
+
+function recommendedPrompt(playerName = "") {
+  const prompts = [
+    "웃고 있는 마늘 캐릭터",
+    "운동장에서 춤추는 고추",
+    "칠판 앞에 선 브로콜리 선생님",
+    "비 오는 날 우산을 든 당근",
+    "소풍 가는 토마토 친구",
+    "달빛 아래 노래하는 가지",
+    "책을 읽는 감자 탐험가",
+    "파도가 치는 바다의 오이 배",
+    "호박 마차를 탄 채소 왕",
+    `${playerName || "친구"}를 놀라게 한 양파`
+  ];
+  return prompts[Math.floor(Math.random() * prompts.length)];
 }
 
 async function handleApi(req, res) {
@@ -289,11 +307,10 @@ async function handleApi(req, res) {
       const body = await readBody(req);
       const player = room.players.find((item) => item.id === body.playerId);
       if (!player) return json(res, 403, { error: "참가자 정보가 맞지 않아요." });
-      const text = String(body.text || "").trim().slice(0, 100);
-      if (!text) return json(res, 400, { error: "글을 입력해 주세요." });
+      const text = (String(body.text || "").trim() || recommendedPrompt(player.name)).slice(0, 100);
       room.writings = room.writings.filter((item) => item.playerId !== player.id);
-      room.writings.push({ playerId: player.id, name: player.name, text, submittedAt: Date.now() });
-      if (room.writings.length >= room.players.length) startCountdown(room, "drawing");
+      room.writings.push({ playerId: player.id, name: player.name, avatar: player.avatar, text, submittedAt: Date.now() });
+      if (room.writings.length >= room.players.length) startDrawing(room);
       json(res, 200, { room: publicRoom(room, player.id) });
       publish(room);
       return;
@@ -315,6 +332,8 @@ async function handleApi(req, res) {
         prompt: player.prompt,
         promptAuthorId: player.promptAuthorId,
         promptAuthorName: player.promptAuthorName,
+        promptAuthorAvatar: room.players.find((item) => item.id === player.promptAuthorId)?.avatar ?? player.avatar,
+        avatar: player.avatar,
         drawing,
         submittedAt: Date.now()
       });
@@ -400,7 +419,7 @@ setInterval(() => {
       publish(room);
     }
     if (room.stage === "writing" && room.roundEndsAt && Date.now() > room.roundEndsAt) {
-      startCountdown(room, "drawing");
+      startDrawing(room);
       publish(room);
     }
     if (room.stage === "drawing" && room.roundEndsAt && Date.now() > room.roundEndsAt) {
