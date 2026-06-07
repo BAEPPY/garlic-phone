@@ -13,6 +13,7 @@ const state = {
   selectedAlbumIndex: 0,
   selectedAlbumStep: 0,
   albumAutoTimer: null,
+  serverTimeOffset: 0,
   lastWritingTurn: -1,
   lastDrawingTurn: -1,
   autoSubmittingDrawing: false
@@ -205,6 +206,17 @@ function isBlockedWordError(message) {
   return String(message || "").includes("욕설이나 비하");
 }
 
+function setRoom(room) {
+  if (room?.serverNow) {
+    state.serverTimeOffset = room.serverNow - Date.now();
+  }
+  state.room = room;
+}
+
+function syncedNow() {
+  return Date.now() + state.serverTimeOffset;
+}
+
 async function loadBlockedWords() {
   try {
     const res = await fetch("/bad-words.json", { cache: "no-store" });
@@ -307,7 +319,7 @@ function connectEvents() {
   if (state.source) state.source.close();
   state.source = new EventSource(`/api/rooms/${state.roomCode}/events?client=${encodeURIComponent(state.playerId)}`);
   state.source.onmessage = (event) => {
-    state.room = JSON.parse(event.data);
+    setRoom(JSON.parse(event.data));
     render();
   };
   state.source.onerror = () => {
@@ -318,7 +330,7 @@ function connectEvents() {
 function enterRoom(room, playerId) {
   state.playerId = playerId;
   state.roomCode = room.code;
-  state.room = room;
+  setRoom(room);
   localStorage.setItem("garlicPhonePlayerId", playerId);
   localStorage.setItem("garlicPhoneAvatar", String(state.avatarIndex));
   history.replaceState(null, "", `/?room=${room.code}`);
@@ -345,7 +357,7 @@ function renderCountdown() {
   const active = state.room?.stage === "countdown";
   els.countdownOverlay.hidden = !active;
   if (!active) return;
-  const remaining = Math.max(1, Math.ceil((state.room.countdownEndsAt - Date.now()) / 1000));
+  const remaining = Math.max(1, Math.ceil((state.room.countdownEndsAt - syncedNow()) / 1000));
   els.countdownNumber.textContent = String(Math.min(3, remaining));
 }
 
@@ -618,7 +630,7 @@ async function submitCurrentDrawing(auto = false) {
       playerId: state.playerId,
       drawing: els.drawCanvas.toDataURL("image/webp", 0.75)
     });
-    state.room = data.room;
+    setRoom(data.room);
     render();
   } catch (error) {
     if (!auto) els.drawingStatus.textContent = error.message;
@@ -641,7 +653,7 @@ async function saveSettings(extra = {}) {
 }
 
 function updateClock(element, totalSeconds, finalNumber = false) {
-  const remaining = state.room?.roundEndsAt ? Math.max(0, Math.ceil((state.room.roundEndsAt - Date.now()) / 1000)) : null;
+  const remaining = state.room?.roundEndsAt ? Math.max(0, Math.ceil((state.room.roundEndsAt - syncedNow()) / 1000)) : null;
   const progress = remaining === null ? 0 : 1 - remaining / Math.max(1, totalSeconds);
   const showFinal = remaining !== null && remaining <= 10 && state.room?.stage !== "countdown";
   element.classList.toggle("final-count", showFinal);
@@ -756,7 +768,7 @@ els.submitWritingButton.addEventListener("click", async () => {
       playerId: state.playerId,
       text: els.writingInput.value
     });
-    state.room = data.room;
+    setRoom(data.room);
     render();
   } catch (error) {
     if (isBlockedWordError(error.message)) showBlockedWordToast();
@@ -853,7 +865,7 @@ setInterval(() => {
   updateClock(els.writeTimer, state.room?.settings?.writeSeconds || 1);
   updateClock(els.drawTimer, state.room?.settings?.drawSeconds || 1, state.room?.stage === "drawing");
   if (state.room?.stage === "drawing" && !state.room.myDrawing && state.room.roundEndsAt) {
-    const millisecondsLeft = state.room.roundEndsAt - Date.now();
+    const millisecondsLeft = state.room.roundEndsAt - syncedNow();
     if (millisecondsLeft <= 1200) submitCurrentDrawing(true);
   }
 }, 250);
