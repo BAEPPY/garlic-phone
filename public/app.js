@@ -93,7 +93,7 @@ ctx.lineCap = "round";
 ctx.lineJoin = "round";
 paintBackground("#ffffff");
 
-const avatarImages = Array.from({ length: 10 }, (_, index) => `/assets/avatars/avatar-${index}.png`);
+const avatarImages = Array.from({ length: 10 }, (_, index) => `/assets/avatars/avatar-${index}.webp`);
 const promptSuggestions = [
   "웃고 있는 마늘 캐릭터",
   "운동장에서 춤추는 고추",

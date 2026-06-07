@@ -14,13 +14,13 @@ body {
   min-height: 100vh;
   overflow-x: hidden;
   color: var(--ink);
-  background: var(--page-bg, url("/assets/backgrounds/home-bg.png")) center / cover fixed no-repeat;
+  background: var(--page-bg, url("/assets/backgrounds/home-bg.webp")) center / cover fixed no-repeat;
 }
-body[data-view="homeView"] { --page-bg: url("/assets/backgrounds/home-bg.png"); }
-body[data-view="lobbyView"] { --page-bg: url("/assets/backgrounds/lobby-bg.png"); }
+body[data-view="homeView"] { --page-bg: url("/assets/backgrounds/home-bg.webp"); }
+body[data-view="lobbyView"] { --page-bg: url("/assets/backgrounds/lobby-bg.webp"); }
 body[data-view="writeView"],
-body[data-view="drawView"] { --page-bg: url("/assets/backgrounds/game-bg.png"); }
-body[data-view="galleryView"] { --page-bg: url("/assets/backgrounds/result-bg.png"); }
+body[data-view="drawView"] { --page-bg: url("/assets/backgrounds/game-bg.webp"); }
+body[data-view="galleryView"] { --page-bg: url("/assets/backgrounds/result-bg.webp"); }
 body::before {
   display: none;
 }
