@@ -163,6 +163,7 @@ function publicRoom(room, clientId = "") {
     mode: room.mode,
     stage: room.stage,
     nextStage: room.nextStage,
+    serverNow: Date.now(),
     countdownEndsAt: room.countdownEndsAt,
     roundEndsAt: room.roundEndsAt,
     turnIndex: room.turnIndex,
@@ -623,7 +624,7 @@ function serveStatic(req, res) {
 
 setInterval(() => {
   for (const room of rooms.values()) {
-    if (room.stage === "countdown" && room.countdownEndsAt && Date.now() > room.countdownEndsAt) {
+    if (room.stage === "countdown" && room.countdownEndsAt && Date.now() >= room.countdownEndsAt) {
       if (room.nextStage === "drawing") startDrawing(room);
       else startWriting(room, room.resetOnCountdown);
       room.resetOnCountdown = false;
@@ -640,7 +641,7 @@ setInterval(() => {
       publish(room);
     }
   }
-}, 1000);
+}, 250);
 
 http.createServer((req, res) => {
   if (req.url === "/healthz") json(res, 200, { ok: true });
