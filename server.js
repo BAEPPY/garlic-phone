@@ -544,7 +544,16 @@ function serveStatic(req, res) {
         return;
       }
       const ext = path.extname(finalPath);
-      const type = ext === ".css" ? "text/css" : ext === ".js" ? "text/javascript" : "text/html";
+      const types = {
+        ".css": "text/css",
+        ".js": "text/javascript",
+        ".json": "application/json",
+        ".png": "image/png",
+        ".jpg": "image/jpeg",
+        ".jpeg": "image/jpeg",
+        ".webp": "image/webp"
+      };
+      const type = types[ext] || "text/html";
       res.writeHead(200, { "Content-Type": `${type}; charset=utf-8` });
       res.end(error ? fallbackData : data);
     });
