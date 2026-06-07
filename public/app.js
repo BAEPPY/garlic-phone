@@ -43,6 +43,7 @@ const els = {
   customLockNote: $("#customLockNote"),
   modeButtons: [...document.querySelectorAll(".mode-card")],
   timePresetSelect: $("#timePresetSelect"),
+  promptTopicSelect: $("#promptTopicSelect"),
   turnsSelect: $("#turnsSelect"),
   keepDrawingSelect: $("#keepDrawingSelect"),
   secrecySelect: $("#secrecySelect"),
@@ -147,6 +148,9 @@ const promptSuggestions = [
   "햇살 아래 웃고 있는 마늘 친구"
 ];
 const fallbackPromptSuggestion = "별을 바라보는 양파 우주비행사";
+let promptPacks = {
+  none: promptSuggestions
+};
 
 const nicknameVeggies = [
   "마늘", "파", "감자", "고추", "당근", "양파", "브로콜리", "토마토", "오이", "상추",
@@ -184,7 +188,8 @@ function hasBlockedWord(value) {
 }
 
 function randomSafePrompt() {
-  const list = promptSuggestions.length ? promptSuggestions : [fallbackPromptSuggestion];
+  const topic = state.room?.settings?.promptTopic || els.promptTopicSelect.value || "none";
+  const list = promptPacks[topic]?.length ? promptPacks[topic] : promptPacks.none || promptSuggestions;
   return list[Math.floor(Math.random() * list.length)];
 }
 
@@ -211,6 +216,22 @@ async function loadBlockedWords() {
     }
   } catch {
     // 서버 필터가 한 번 더 막으므로 화면 목록 로딩 실패는 조용히 넘어갑니다.
+  }
+}
+
+async function loadPromptPacks() {
+  try {
+    const res = await fetch("/prompt-packs.json", { cache: "no-store" });
+    if (!res.ok) return;
+    const data = await res.json();
+    if (!data?.packs) return;
+    promptPacks = Object.fromEntries(
+      Object.entries(data.packs)
+        .filter(([, pack]) => Array.isArray(pack.prompts))
+        .map(([id, pack]) => [id, pack.prompts])
+    );
+  } catch {
+    promptPacks = { none: promptSuggestions };
   }
 }
 
@@ -251,6 +272,7 @@ function settingFromControls() {
   return {
     maxPlayers: Number(els.maxPlayersSelect.value),
     timeMode: els.timePresetSelect.value,
+    promptTopic: els.promptTopicSelect.value,
     turns: els.turnsSelect.value,
     keepDrawing: els.keepDrawingSelect.value === "enabled",
     secrecy: els.secrecySelect.value,
@@ -262,6 +284,7 @@ function controlsFromSettings(settings) {
   if (!settings) return;
   els.maxPlayersSelect.value = String(settings.maxPlayers);
   els.timePresetSelect.value = settings.timeMode || "normal";
+  els.promptTopicSelect.value = settings.promptTopic || "none";
   els.turnsSelect.value = settings.turns || "all";
   els.keepDrawingSelect.value = settings.keepDrawing ? "enabled" : "disabled";
   els.secrecySelect.value = settings.secrecy || "public";
@@ -485,7 +508,7 @@ function setControlsDisabled(disabled) {
   els.modeButtons.forEach((button) => {
     button.disabled = disabled;
   });
-  [els.timePresetSelect, els.turnsSelect, els.keepDrawingSelect, els.secrecySelect].forEach((control) => {
+  [els.timePresetSelect, els.promptTopicSelect, els.turnsSelect, els.keepDrawingSelect, els.secrecySelect].forEach((control) => {
     control.disabled = disabled || customLocked;
   });
   els.maxPlayersSelect.disabled = disabled;
@@ -673,7 +696,7 @@ els.galleryHomeButton.addEventListener("click", () => {
   location.href = "/";
 });
 
-[els.maxPlayersSelect, els.timePresetSelect, els.turnsSelect, els.keepDrawingSelect, els.secrecySelect, els.soundToggle].forEach((control) => {
+[els.maxPlayersSelect, els.timePresetSelect, els.promptTopicSelect, els.turnsSelect, els.keepDrawingSelect, els.secrecySelect, els.soundToggle].forEach((control) => {
   control.addEventListener("change", () => saveSettings());
 });
 
@@ -843,4 +866,5 @@ if (state.roomCode) {
 renderAvatar();
 refreshBlockedWords();
 loadBlockedWords();
+loadPromptPacks();
 showScreen("homeView");
