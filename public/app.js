@@ -95,17 +95,58 @@ paintBackground("#ffffff");
 
 const avatarImages = Array.from({ length: 10 }, (_, index) => `/assets/avatars/avatar-${index}.webp`);
 const promptSuggestions = [
-  "웃고 있는 마늘 캐릭터",
-  "운동장에서 춤추는 고추",
-  "칠판 앞에 선 브로콜리 선생님",
-  "비 오는 날 우산을 든 당근",
-  "마법사가 된 토마토 친구",
-  "무지개 아래 노래하는 가지",
-  "책을 읽는 감자 탐험가",
-  "파도가 치는 바다 위의 양파",
-  "호박 마차를 탄 채소 왕",
-  "인사말을 만든 쪽파"
+  "별을 바라보는 양파 우주비행사",
+  "꽃밭에서 웃는 파프리카 친구",
+  "연필을 든 무 학생",
+  "구름 위를 걷는 배추 요정",
+  "노래 대회에 나간 시금치 가수",
+  "작은 모자를 쓴 상추 탐정",
+  "분수대 옆에서 쉬는 깻잎 화가",
+  "바람개비를 돌리는 대파 아이",
+  "눈사람을 만드는 고구마 형제",
+  "도서관에서 공부하는 양배추 박사",
+  "무지개 다리를 건너는 완두콩 가족",
+  "피아노를 치는 가지 음악가",
+  "모래성을 쌓는 오이 친구",
+  "로봇을 조종하는 감자 기사",
+  "해바라기 옆에서 낮잠 자는 당근 토끼",
+  "자전거를 타는 브로콜리 선수",
+  "별빛 아래 춤추는 호박 공주",
+  "종이배를 띄우는 연근 소녀",
+  "숲속 길을 안내하는 셀러리 지도사",
+  "풍선을 들고 뛰는 피망 꼬마",
+  "빨간 망토를 두른 토마토 영웅",
+  "산꼭대기에서 외치는 콜리플라워 탐험대장",
+  "하늘을 나는 애호박 비행사",
+  "그림책 속으로 들어간 케일 마법사",
+  "바닷가에서 조개를 줍는 콩나물 친구",
+  "기차역에서 손 흔드는 숙주 요정",
+  "빗방울을 연주하는 청경채 악단",
+  "커다란 안경을 쓴 비트 선생님",
+  "나비와 인사하는 아스파라거스 왕자",
+  "달팽이와 경주하는 우엉 선수",
+  "작은 성을 지키는 도라지 기사",
+  "별 모양 쿠키를 굽는 파슬리 요리사",
+  "운동화를 신은 루꼴라 달리기 선수",
+  "커다란 책가방을 멘 콜라비 학생",
+  "벚꽃길을 걷는 고사리 여행자",
+  "연못가에서 낚시하는 무 할아버지",
+  "마법 빗자루를 탄 양파 마녀",
+  "캠핑장에서 노래하는 감자 친구들",
+  "눈 오는 마을의 배추 우체부",
+  "커피잔 속을 여행하는 완두콩 탐험가",
+  "별사탕을 나누는 토마토 친구",
+  "구름 침대에서 쉬는 브로콜리 왕",
+  "시장에서 길을 잃은 당근 꼬마",
+  "책상 위에서 그림 그리는 오이 화가",
+  "작은 북을 치는 대파 악사",
+  "무대 위에서 인사하는 파프리카 배우",
+  "폭포 아래에서 명상하는 가지 수도사",
+  "은하수를 건너는 호박 마차",
+  "편지를 배달하는 상추 비둘기",
+  "햇살 아래 웃고 있는 마늘 친구"
 ];
+const fallbackPromptSuggestion = "별을 바라보는 양파 우주비행사";
 
 const nicknameVeggies = [
   "마늘", "파", "감자", "고추", "당근", "양파", "브로콜리", "토마토", "오이", "상추",
@@ -142,6 +183,11 @@ function hasBlockedWord(value) {
   return Boolean(normalized) && normalizedBlockedWords.some((word) => normalized.includes(word));
 }
 
+function randomSafePrompt() {
+  const list = promptSuggestions.length ? promptSuggestions : [fallbackPromptSuggestion];
+  return list[Math.floor(Math.random() * list.length)];
+}
+
 function showBlockedWordToast() {
   window.clearTimeout(blockedToastTimer);
   els.blockedWordToast.hidden = false;
@@ -160,7 +206,7 @@ async function loadBlockedWords() {
     if (!res.ok) return;
     const words = await res.json();
     if (Array.isArray(words)) {
-      blockedWords.push(...words.filter((word) => typeof word === "string"));
+      blockedWords.push(...words.filter((word) => typeof word === "string" && normalizeForFilter(word).length > 1));
       refreshBlockedWords();
     }
   } catch {
@@ -675,10 +721,11 @@ els.forceWritingButton.addEventListener("click", async () => {
 
 els.submitWritingButton.addEventListener("click", async () => {
   try {
+    const usedAutoPrompt = !els.writingInput.value.trim();
     if (!els.writingInput.value.trim()) {
-      els.writingInput.value = promptSuggestions[Math.floor(Math.random() * promptSuggestions.length)];
+      els.writingInput.value = randomSafePrompt();
     }
-    if (hasBlockedWord(els.writingInput.value)) {
+    if (!usedAutoPrompt && hasBlockedWord(els.writingInput.value)) {
       showBlockedWordToast();
       return;
     }
