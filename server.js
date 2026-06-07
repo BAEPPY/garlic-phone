@@ -7,9 +7,11 @@ const publicDir = path.join(__dirname, "public");
 const port = Number(process.env.PORT || 4173);
 const rooms = new Map();
 const badWordsPath = path.join(publicDir, "bad-words.json");
+const promptPacksPath = path.join(publicDir, "prompt-packs.json");
 const modes = new Set(["normal", "knockoff", "animation", "custom"]);
 const timeModes = new Set(["fast", "normal", "slow", "regressive", "progressive", "dynamic", "infinite", "host", "fasterFirst", "slowerFirst"]);
 const turnModes = new Set(["few", "most", "all", "allPlusOne", "double", "triple", "single", "2", "3", "4", "5", "6", "7", "8"]);
+const promptTopicIds = new Set(["none", "food", "fruit", "vegetable", "animal", "school", "sports", "job", "vehicle", "place", "weather"]);
 
 function id(size = 8, mixed = false) {
   const letters = "ABCDEFGHJKLMNPQRSTUVWXYZ";
@@ -109,6 +111,7 @@ function makeSettings(settings = {}) {
   return {
     maxPlayers: clamp(settings.maxPlayers, 2, 30, 14),
     timeMode,
+    promptTopic: promptTopicIds.has(settings.promptTopic) ? settings.promptTopic : "none",
     writeSeconds: seconds.writeSeconds,
     drawSeconds: seconds.drawSeconds,
     turns: turnModes.has(settings.turns) ? settings.turns : "all",
@@ -351,7 +354,7 @@ function addDrawingEntry(room, player, drawing) {
 
 function fillMissingWriting(room) {
   for (const player of missingPlayers(room)) {
-    addWritingEntry(room, player, recommendedPrompt(player.name));
+    addWritingEntry(room, player, recommendedPrompt(room));
   }
 }
 
@@ -413,9 +416,25 @@ const promptSuggestions = [
   "편지를 배달하는 상추 비둘기",
   "햇살 아래 웃고 있는 마늘 친구"
 ];
+let promptPacks = { none: promptSuggestions };
 
-function recommendedPrompt(playerName = "") {
-  const list = promptSuggestions.length ? promptSuggestions : ["별을 바라보는 양파 우주비행사"];
+try {
+  const promptPackData = JSON.parse(fs.readFileSync(promptPacksPath, "utf8").replace(/^\uFEFF/, ""));
+  if (promptPackData?.packs) {
+    promptPacks = Object.fromEntries(
+      Object.entries(promptPackData.packs)
+        .filter(([, pack]) => Array.isArray(pack.prompts))
+        .map(([topic, pack]) => [topic, pack.prompts.filter((prompt) => typeof prompt === "string" && prompt.trim())])
+    );
+  }
+} catch {
+  console.warn("prompt-packs.json을 읽지 못해서 기본 추천 제시어만 사용합니다.");
+}
+const allPromptSuggestions = [...new Set(Object.values(promptPacks).flat())];
+
+function recommendedPrompt(room) {
+  const topic = room?.settings?.promptTopic || "none";
+  const list = promptPacks[topic]?.length ? promptPacks[topic] : promptPacks.none || promptSuggestions;
   return list[Math.floor(Math.random() * list.length)];
 }
 
@@ -505,7 +524,7 @@ async function handleApi(req, res) {
       const body = await readBody(req);
       const player = room.players.find((item) => item.id === body.playerId);
       if (!player) return json(res, 403, { error: "참가자 정보가 맞지 않아요." });
-      const text = cleanUserText(body.text, recommendedPrompt(player.name), 100, promptSuggestions);
+      const text = cleanUserText(body.text, recommendedPrompt(room), 100, allPromptSuggestions);
       addWritingEntry(room, player, text);
       if (currentEntries(room).length >= room.players.length) advanceTurn(room);
       json(res, 200, { room: publicRoom(room, player.id) });
