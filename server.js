@@ -6,6 +6,7 @@ const crypto = require("crypto");
 const publicDir = path.join(__dirname, "public");
 const port = Number(process.env.PORT || 4173);
 const rooms = new Map();
+const badWordsPath = path.join(publicDir, "bad-words.json");
 const modes = new Set(["normal", "knockoff", "animation", "custom"]);
 const timeModes = new Set(["fast", "normal", "slow", "regressive", "progressive", "dynamic", "infinite", "host", "fasterFirst", "slowerFirst"]);
 const turnModes = new Set(["few", "most", "all", "allPlusOne", "double", "triple", "single", "2", "3", "4", "5", "6", "7", "8"]);
@@ -53,6 +54,46 @@ function clamp(value, min, max, fallback) {
   const number = Number(value);
   if (!Number.isFinite(number)) return fallback;
   return Math.max(min, Math.min(max, number));
+}
+
+const blockedWords = [
+  "씨발", "시발", "ㅅㅂ", "ㅆㅂ", "병신", "ㅂㅅ", "개새끼", "새끼", "꺼져", "죽어",
+  "좆", "존나", "미친", "등신", "멍청이", "바보새끼", "닥쳐", "엿먹어", "지랄",
+  "니애미", "느금마", "애미", "애비", "장애", "찐따", "빡대가리", "또라이",
+  "fuck", "shit", "bitch", "asshole", "damn", "sex", "porn"
+];
+
+try {
+  const externalBlockedWords = JSON.parse(fs.readFileSync(badWordsPath, "utf8").replace(/^\uFEFF/, ""));
+  if (Array.isArray(externalBlockedWords)) {
+    blockedWords.push(...externalBlockedWords.filter((word) => typeof word === "string"));
+  }
+} catch {
+  console.warn("bad-words.json을 읽지 못해서 기본 금지어만 사용합니다.");
+}
+
+function normalizeForFilter(value) {
+  return String(value || "")
+    .toLowerCase()
+    .replace(/[0-9０-９]/g, "")
+    .replace(/[\s._\-~!@#$%^&*()[\]{}+=|\\:;"'<>,.?/`·ㆍ…ㄱ-ㅎㅏ-ㅣ]/g, "");
+}
+
+const normalizedBlockedWords = [...new Set(blockedWords.map(normalizeForFilter).filter(Boolean))];
+
+function hasBlockedWord(value) {
+  const normalized = normalizeForFilter(value);
+  return Boolean(normalized) && normalizedBlockedWords.some((word) => normalized.includes(word));
+}
+
+function cleanUserText(value, fallback, maxLength) {
+  const text = String(value || "").trim().slice(0, maxLength) || fallback;
+  if (hasBlockedWord(text)) {
+    const error = new Error("욕설이나 비하 표현은 사용할 수 없어요.");
+    error.code = "BLOCKED_WORD";
+    throw error;
+  }
+  return text;
 }
 
 function timeSeconds(timeMode) {
@@ -343,7 +384,7 @@ async function handleApi(req, res) {
   try {
     if (req.method === "POST" && url.pathname === "/api/rooms") {
       const body = await readBody(req);
-      const name = String(body.name || "플레이어").trim().slice(0, 18) || "플레이어";
+      const name = cleanUserText(body.name, "플레이어", 18);
       const { room, playerId } = makeRoom(name, { ...body.settings, mode: body.mode, avatar: body.avatar });
       json(res, 200, { playerId, room: publicRoom(room, playerId) });
       publish(room);
@@ -356,7 +397,7 @@ async function handleApi(req, res) {
       if (room.players.length >= room.settings.maxPlayers) return json(res, 403, { error: "이 방은 가득 찼어요." });
       if (room.stage !== "lobby") return json(res, 403, { error: "이미 게임이 시작된 방이에요." });
       const body = await readBody(req);
-      const name = String(body.name || "플레이어").trim().slice(0, 18) || "플레이어";
+      const name = cleanUserText(body.name, "플레이어", 18);
       const playerId = id(12);
       room.players.push({ id: playerId, name, avatar: clamp(body.avatar, 0, 9, room.players.length % 10), joinedAt: Date.now(), prompt: "", promptAuthorId: "", promptAuthorName: "" });
       json(res, 200, { playerId, room: publicRoom(room, playerId) });
@@ -422,7 +463,7 @@ async function handleApi(req, res) {
       const body = await readBody(req);
       const player = room.players.find((item) => item.id === body.playerId);
       if (!player) return json(res, 403, { error: "참가자 정보가 맞지 않아요." });
-      const text = (String(body.text || "").trim() || recommendedPrompt(player.name)).slice(0, 100);
+      const text = cleanUserText(body.text, recommendedPrompt(player.name), 100);
       addWritingEntry(room, player, text);
       if (currentEntries(room).length >= room.players.length) advanceTurn(room);
       json(res, 200, { room: publicRoom(room, player.id) });
