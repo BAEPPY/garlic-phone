@@ -17,12 +17,14 @@ const state = {
   lastDrawingTurn: -1,
   autoSubmittingDrawing: false
 };
+let blockedToastTimer = null;
 
 const $ = (selector) => document.querySelector(selector);
 const els = {
   screens: [...document.querySelectorAll(".screen")],
   countdownOverlay: $("#countdownOverlay"),
   countdownNumber: $("#countdownNumber"),
+  blockedWordToast: $("#blockedWordToast"),
   playerName: $("#playerName"),
   joinCode: $("#joinCode"),
   roomCodeField: $("#roomCodeField"),
@@ -111,9 +113,59 @@ const nicknameVeggies = [
   "콩나물", "부추", "연근", "고구마", "완두콩"
 ];
 
+const blockedWords = [
+  "씨발", "시발", "ㅅㅂ", "ㅆㅂ", "병신", "ㅂㅅ", "개새끼", "새끼", "꺼져", "죽어",
+  "좆", "존나", "미친", "등신", "멍청이", "바보새끼", "닥쳐", "엿먹어", "지랄",
+  "니애미", "느금마", "애미", "애비", "장애", "찐따", "빡대가리", "또라이",
+  "fuck", "shit", "bitch", "asshole", "damn", "sex", "porn"
+];
+let normalizedBlockedWords = [];
+
 function randomNickname() {
   const veggie = nicknameVeggies[Math.floor(Math.random() * nicknameVeggies.length)];
   return `${veggie}${Math.floor(1000 + Math.random() * 9000)}`;
+}
+
+function normalizeForFilter(value) {
+  return String(value || "")
+    .toLowerCase()
+    .replace(/[0-9０-９]/g, "")
+    .replace(/[\s._\-~!@#$%^&*()[\]{}+=|\\:;"'<>,.?/`·ㆍ…ㄱ-ㅎㅏ-ㅣ]/g, "");
+}
+
+function refreshBlockedWords() {
+  normalizedBlockedWords = [...new Set(blockedWords.map(normalizeForFilter).filter(Boolean))];
+}
+
+function hasBlockedWord(value) {
+  const normalized = normalizeForFilter(value);
+  return Boolean(normalized) && normalizedBlockedWords.some((word) => normalized.includes(word));
+}
+
+function showBlockedWordToast() {
+  window.clearTimeout(blockedToastTimer);
+  els.blockedWordToast.hidden = false;
+  blockedToastTimer = window.setTimeout(() => {
+    els.blockedWordToast.hidden = true;
+  }, 1000);
+}
+
+function isBlockedWordError(message) {
+  return String(message || "").includes("욕설이나 비하");
+}
+
+async function loadBlockedWords() {
+  try {
+    const res = await fetch("/bad-words.json", { cache: "no-store" });
+    if (!res.ok) return;
+    const words = await res.json();
+    if (Array.isArray(words)) {
+      blockedWords.push(...words.filter((word) => typeof word === "string"));
+      refreshBlockedWords();
+    }
+  } catch {
+    // 서버 필터가 한 번 더 막으므로 화면 목록 로딩 실패는 조용히 넘어갑니다.
+  }
 }
 
 function showScreen(id) {
@@ -550,12 +602,17 @@ els.randomNameButton.addEventListener("click", () => {
 els.enterButton.addEventListener("click", async () => {
   try {
     const name = els.playerName.value.trim() || randomNickname();
+    if (hasBlockedWord(name)) {
+      showBlockedWordToast();
+      return;
+    }
     const code = (els.joinCode.value || state.roomCode).trim().toUpperCase();
     const data = code
       ? await api(`/api/rooms/${code}/join`, { name, avatar: state.avatarIndex })
       : await api("/api/rooms", { name, avatar: state.avatarIndex, settings: settingFromControls(), mode: selectedMode() });
     enterRoom(data.room, data.playerId);
   } catch (error) {
+    if (isBlockedWordError(error.message)) showBlockedWordToast();
     setStatus(error.message);
   }
 });
@@ -621,6 +678,10 @@ els.submitWritingButton.addEventListener("click", async () => {
     if (!els.writingInput.value.trim()) {
       els.writingInput.value = promptSuggestions[Math.floor(Math.random() * promptSuggestions.length)];
     }
+    if (hasBlockedWord(els.writingInput.value)) {
+      showBlockedWordToast();
+      return;
+    }
     const data = await api(`/api/rooms/${state.room.code}/submit-writing`, {
       playerId: state.playerId,
       text: els.writingInput.value
@@ -628,6 +689,7 @@ els.submitWritingButton.addEventListener("click", async () => {
     state.room = data.room;
     render();
   } catch (error) {
+    if (isBlockedWordError(error.message)) showBlockedWordToast();
     els.writingStatus.textContent = error.message;
   }
 });
@@ -732,4 +794,6 @@ if (state.roomCode) {
 }
 
 renderAvatar();
+refreshBlockedWords();
+loadBlockedWords();
 showScreen("homeView");

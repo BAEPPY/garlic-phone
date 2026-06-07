@@ -39,6 +39,26 @@ button { cursor: pointer; }
   backdrop-filter: blur(2px);
 }
 .countdown-overlay[hidden] { display: none !important; }
+.blocked-word-toast {
+  position: fixed;
+  left: 50%;
+  top: 26px;
+  z-index: 30;
+  transform: translateX(-50%);
+  min-width: min(360px, calc(100vw - 40px));
+  padding: 14px 24px;
+  border: 4px solid #fff2f8;
+  border-radius: 999px;
+  background: #ff74b8;
+  color: #fff;
+  box-shadow: 0 7px 0 #9f4c72, 0 14px 24px rgba(98, 48, 21, .22);
+  font-size: 22px;
+  font-weight: 950;
+  text-align: center;
+  text-shadow: 0 2px 0 rgba(82, 35, 23, .28);
+  pointer-events: none;
+}
+.blocked-word-toast[hidden] { display: none !important; }
 .countdown-card {
   position: relative;
   width: min(440px, 70vw);
